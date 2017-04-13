@@ -19,14 +19,7 @@ from keras import optimizers
 from keras.optimizers import Adam, RMSprop
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
-# TensorFlow Flags
-import os
-# Get rid of logging
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-# Force CPU usage
-# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
-# os.environ["CUDA_VISIBLE_DEVICES"] = ""
+import tensorflow as tf
 
 def loadGloveModel(gloveFile):
     print("Loading Glove Model...")
@@ -275,9 +268,9 @@ for word, i in word_index.items():
         embedding_matrix[i] = embedding_vector
 
 # Hyper-parameters
-SENT_HIDDEN_SIZE = 100
+CONTEXT_HIDDEN_SIZE = 100
 QUERY_HIDDEN_SIZE = 100
-BATCH_SIZE = 32
+BATCH_SIZE = 512
 EPOCHS = 40
 
 context = Input(shape=(context_maxlen,), dtype='int32')
