@@ -8,7 +8,8 @@ import nltk
 from keras.utils.data_utils import get_file
 from keras.layers.embeddings import Embedding
 from keras.layers import Input, Dense, Dropout, RepeatVector, Activation, Lambda, Flatten, Reshape
-from keras.layers import LSTM, Bidirectional, TimeDistributed, GRU, AveragePooling1D, Reshape, GlobalAveragePooling1D
+from keras.layers import LSTM, Bidirectional, TimeDistributed, GRU, AveragePooling1D, Reshape
+from keras.layers import GlobalAveragePooling1D
 from keras.layers import concatenate, add, dot, Permute
 from keras.models import Model, Sequential
 from keras.preprocessing.sequence import pad_sequences
@@ -41,7 +42,7 @@ def loadGloveModel(gloveFile):
     return embedding_index
 
 def tokenize(sent):
-    '''Return the tokens of a sentence including punctuation.
+    '''Return the tokens of a context including punctuation.
 
     >>> tokenize('Bob dropped the apple. Where is the apple?')
     ['Bob', 'dropped', 'the', 'apple', '.', 'Where', 'is', 'the', 'apple', '?']
@@ -49,7 +50,7 @@ def tokenize(sent):
     return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
 
 def tokenizeVal(sent):
-    '''Return the tokens of a sentence including punctuation.
+    '''Return the tokens of a context including punctuation.
 
     >>> tokenize('Bob dropped the apple. Where is the apple?')
     ['Bob', 'dropped', 'the', 'apple', '.', 'Where', 'is', 'the', 'apple', '?']
@@ -274,24 +275,27 @@ for word, i in word_index.items():
         embedding_matrix[i] = embedding_vector
 
 # Hyper-parameters
-EMBED_HIDDEN_SIZE = 50
 SENT_HIDDEN_SIZE = 100
 QUERY_HIDDEN_SIZE = 100
 BATCH_SIZE = 32
 EPOCHS = 40
 
 context = Input(shape=(context_maxlen,), dtype='int32')
-encoded_context = Embedding(vocab_size, EMBED_HIDDEN_SIZE)(context)
+encoded_context = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
+                            weights=[embedding_matrix],
+                            input_length=context_maxlen, trainable=False)(context)
 encoded_context = Dropout(0.3)(encoded_context)
 
 question = Input(shape=(question_maxlen,), dtype='int32')
-encoded_question = Embedding(vocab_size, EMBED_HIDDEN_SIZE)(question)
+encoded_question = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
+                             weights=[embedding_matrix],
+                             input_length=question_maxlen, trainable=False)(question)
 encoded_question = Dropout(0.3)(encoded_question)
-encoded_question = LSTM(EMBED_HIDDEN_SIZE)(encoded_question)
+encoded_question = LSTM(EMBEDDING_DIM)(encoded_question)
 encoded_question = RepeatVector(context_maxlen)(encoded_question)
 
-merged = add([encoded_sentence, encoded_question])
-merged = LSTM(EMBED_HIDDEN_SIZE)(merged)
+merged = add([encoded_context, encoded_question])
+merged = LSTM(EMBEDDING_DIM)(merged)
 merged = Dropout(0.3)(merged)
 
 answerPtrBegin_output = Dense(context_maxlen, activation='softmax')(merged)
@@ -302,6 +306,8 @@ model = Model([context, question], [answerPtrBegin_output, answerPtrEnd_output])
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
+
+model.summary()
 
 print('Training...')
 model.fit([tX, tXq], [tYBegin, tYEnd],
