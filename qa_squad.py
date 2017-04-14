@@ -270,8 +270,8 @@ for word, i in word_index.items():
 # Hyper-parameters
 CONTEXT_HIDDEN_SIZE = 100
 QUERY_HIDDEN_SIZE = 100
-BATCH_SIZE = 512
-EPOCHS = 40
+BATCH_SIZE = 256
+EPOCHS = 100
 
 context = Input(shape=(context_maxlen,), dtype='int32')
 encoded_context = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
@@ -332,4 +332,4 @@ for i in range(len(vQuestion_id)):
 
 # write out answers to json file
 with io.open('./data/predictions.json', 'w', encoding='utf-8') as f:
-    f.write(unicode(json.dumps(answers, ensure_ascii=False)))
+    f.write(json.dumps(answers, ensure_ascii=False))
