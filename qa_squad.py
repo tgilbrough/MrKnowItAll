@@ -4,6 +4,7 @@ import numpy as np
 import re
 import io
 import nltk
+nltk.download('punkt')
 
 from keras.utils.data_utils import get_file
 from keras.layers.embeddings import Embedding
@@ -29,7 +30,7 @@ def loadGloveModel(gloveFile):
         values = line.split()
         word = values[0]
         coefs = np.asarray(values[1:], dtype='float32')
-        embedding_index[word] = coefs 
+        embedding_index[word] = coefs
     f.close()
     print('Found %s word vectors.' % len(embedding_index))
     return embedding_index
@@ -57,14 +58,14 @@ def tokenizeVal(sent):
         if sent[idx:idx+len(word)] == word:
             tokenIdx2CharIdx[token_idx] = idx
             idx += len(word)
-            token_idx += 1 
+            token_idx += 1
         else:
             idx += 1
     return tokenizedSent, tokenIdx2CharIdx
 
 
 def splitDatasets(f):
-    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices, 
+    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
        and keep track of max context and question lengths.
     '''
     xContext = [] # list of contexts paragraphs
@@ -103,7 +104,7 @@ def splitDatasets(f):
                     contextToAnswerFirstWord = context1[:answer['answer_start'] + len(answerTokenized[0])]
                     answerBeginIndex = len(tokenize(contextToAnswerFirstWord.lower())) - 1
                     answerEndIndex = answerBeginIndex + len(answerTokenized) - 1
-                    
+
                     xContext.append(contextTokenized)
                     xQuestion.append(questionTokenized)
                     xQuestion_id.append(str(question_id))
@@ -114,7 +115,7 @@ def splitDatasets(f):
 
 # for validation dataset, as there's no need to keep track of answers
 def splitValDatasets(f):
-    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices, 
+    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
        and keep track of max context and question lengths.
     '''
     xContext = [] # list of contexts paragraphs
@@ -145,7 +146,7 @@ def splitValDatasets(f):
                     maxLenQuestion = len(questionTokenized)
                 question_id = qa['id']
                 answers = qa['answers']
-                
+
                 xToken2CharIdx.append(tokenIdx2CharIdx)
                 xContextOriginal.append(context)
                 xContext.append(contextTokenized)
@@ -199,10 +200,10 @@ def import_json(json_file):
     with open(json_file, encoding='utf-8') as f:
         data = json.load(f)
     return data
-     
+
 # Note: Need to download and unzip Glove pre-train model files into same file as this script
 GloveDimOption = '50' # this  could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
-embeddings_index = loadGloveModel('./data/glove/glove.6B.' + GloveDimOption + 'd.txt')  
+embeddings_index = loadGloveModel('./data/glove/glove.6B.' + GloveDimOption + 'd.txt')
 
 # load training data, parse, and split
 print('Loading in training data...')
@@ -221,7 +222,7 @@ for words in tContext + tQuestion + vContext + vQuestion:
     for word in words:
         if word not in vocab:
             vocab[word] = 1
-vocab = sorted(vocab.keys())  
+vocab = sorted(vocab.keys())
 # Reserve 0 for masking via pad_sequences
 vocab_size = len(vocab) + 1
 word_index = dict((c, i + 1) for i, c in enumerate(vocab))
@@ -313,7 +314,7 @@ predictions = model.predict([vX, vXq], batch_size=64)
 print(predictions[0].shape, predictions[1].shape)
 # make class prediction
 ansBegin = np.zeros((predictions[0].shape[0],), dtype=np.int32)
-ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32) 
+ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32)
 for i in range(predictions[0].shape[0]):
 	ansBegin[i] = predictions[0][i, :].argmax()
 	ansEnd[i] = predictions[1][i, :].argmax()
