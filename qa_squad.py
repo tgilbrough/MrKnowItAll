@@ -43,27 +43,6 @@ def tokenize(sent):
     '''
     return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
 
-def tokenizeVal(sent):
-    '''Return the tokens of a context including punctuation.
-
-    >>> tokenize('Bob dropped the apple. Where is the apple?')
-    ['Bob', 'dropped', 'the', 'apple', '.', 'Where', 'is', 'the', 'apple', '?']
-    '''
-    tokenizedSent = [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
-    tokenIdx2CharIdx = [None] * len(tokenizedSent)
-    idx = 0
-    token_idx = 0
-    while idx < len(sent) and token_idx < len(tokenizedSent):
-        word = tokenizedSent[token_idx]
-        if sent[idx:idx+len(word)] == word:
-            tokenIdx2CharIdx[token_idx] = idx
-            idx += len(word)
-            token_idx += 1
-        else:
-            idx += 1
-    return tokenizedSent, tokenIdx2CharIdx
-
-
 def splitDatasets(f):
     '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
        and keep track of max context and question lengths.
