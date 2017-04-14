@@ -4,6 +4,7 @@ import numpy as np
 import re
 import io
 import nltk
+nltk.download('punkt')
 
 from keras.utils.data_utils import get_file
 from keras.layers.embeddings import Embedding
@@ -29,7 +30,7 @@ def loadGloveModel(gloveFile):
         values = line.split()
         word = values[0]
         coefs = np.asarray(values[1:], dtype='float32')
-        embedding_index[word] = coefs 
+        embedding_index[word] = coefs
     f.close()
     print('Found %s word vectors.' % len(embedding_index))
     return embedding_index
@@ -57,14 +58,14 @@ def tokenizeVal(sent):
         if sent[idx:idx+len(word)] == word:
             tokenIdx2CharIdx[token_idx] = idx
             idx += len(word)
-            token_idx += 1 
+            token_idx += 1
         else:
             idx += 1
     return tokenizedSent, tokenIdx2CharIdx
 
 
 def splitDatasets(f):
-    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices, 
+    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
        and keep track of max context and question lengths.
     '''
     xContext = [] # list of contexts paragraphs
@@ -103,7 +104,7 @@ def splitDatasets(f):
                     contextToAnswerFirstWord = context1[:answer['answer_start'] + len(answerTokenized[0])]
                     answerBeginIndex = len(tokenize(contextToAnswerFirstWord.lower())) - 1
                     answerEndIndex = answerBeginIndex + len(answerTokenized) - 1
-                    
+
                     xContext.append(contextTokenized)
                     xQuestion.append(questionTokenized)
                     xQuestion_id.append(str(question_id))
@@ -111,48 +112,6 @@ def splitDatasets(f):
                     xAnswerEnd.append(answerEndIndex)
                     xAnswerText.append(answerText)
     return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
-
-# for validation dataset, as there's no need to keep track of answers
-def splitValDatasets(f):
-    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices, 
-       and keep track of max context and question lengths.
-    '''
-    xContext = [] # list of contexts paragraphs
-    xQuestion = [] # list of questions
-    xQuestion_id = [] # list of question id
-    xToken2CharIdx = []
-    xContextOriginal = []
-    maxLenContext = 0
-    maxLenQuestion = 0
-
-    for data in f['data']:
-        paragraphs = data['paragraphs']
-        for paragraph in paragraphs:
-            context = paragraph['context']
-            context1 = context.replace("''", '" ')
-            context1 = context1.replace("``", '" ')
-            contextTokenized, tokenIdx2CharIdx = tokenizeVal(context1.lower())
-            contextLength = len(contextTokenized)
-            if contextLength > maxLenContext:
-                maxLenContext = contextLength
-            qas = paragraph['qas']
-            for qa in qas:
-                question = qa['question']
-                question = question.replace("''", '" ')
-                question = question.replace("``", '" ')
-                questionTokenized = tokenize(question.lower())
-                if len(questionTokenized) > maxLenQuestion:
-                    maxLenQuestion = len(questionTokenized)
-                question_id = qa['id']
-                answers = qa['answers']
-                
-                xToken2CharIdx.append(tokenIdx2CharIdx)
-                xContextOriginal.append(context)
-                xContext.append(contextTokenized)
-                xQuestion.append(questionTokenized)
-                xQuestion_id.append(str(question_id))
-
-    return xContext, xToken2CharIdx, xContextOriginal, xQuestion, xQuestion_id, maxLenContext, maxLenQuestion
 
 
 def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, context_maxlen, question_maxlen):
@@ -177,32 +136,14 @@ def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, con
         YEnd.append(y_End)
     return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), pad_sequences(YBegin, maxlen=context_maxlen, padding='post'), pad_sequences(YEnd, maxlen=context_maxlen, padding='post')
 
-# for validation dataset
-def vectorizeValData(xContext, xQuestion, word_index, context_maxlen, question_maxlen):
-    '''Vectorize the words to their respective index and pad context to max context length and question to max question length.
-       Answers vectors are padded to the max context length as well.
-    '''
-    X = []
-    Xq = []
-    YBegin = []
-    YEnd = []
-    for i in range(len(xContext)):
-        x = [word_index[w] for w in xContext[i]]
-        xq = [word_index[w] for w in xQuestion[i]]
-
-        X.append(x)
-        Xq.append(xq)
-
-    return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post')
-
 def import_json(json_file):
     with open(json_file, encoding='utf-8') as f:
         data = json.load(f)
     return data
-     
+
 # Note: Need to download and unzip Glove pre-train model files into same file as this script
 GloveDimOption = '50' # this  could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
-embeddings_index = loadGloveModel('./data/glove/glove.6B.' + GloveDimOption + 'd.txt')  
+embeddings_index = loadGloveModel('./data/glove/glove.6B.' + GloveDimOption + 'd.txt')
 
 # load training data, parse, and split
 print('Loading in training data...')
@@ -212,7 +153,7 @@ tContext, tQuestion, tQuestion_id, tAnswerBegin, tAnswerEnd, tAnswerText, maxLen
 # load validation data, parse, and split
 print('Loading in validation data...')
 valData = import_json('./data/squad/val_small.json')
-vContext, vToken2CharIdx, vContextOriginal, vQuestion, vQuestion_id, maxLenVContext, maxLenVQuestion = splitValDatasets(valData)
+vContext, vQuestion, vQuestion_id, vAnswerBegin, vAnswerEnd, vAnswerText, maxLenVContext, maxLenVQuestion = splitDatasets(valData)
 
 print('Building vocabulary...')
 # build a vocabular over all training and validation context paragraphs and question words
@@ -221,7 +162,7 @@ for words in tContext + tQuestion + vContext + vQuestion:
     for word in words:
         if word not in vocab:
             vocab[word] = 1
-vocab = sorted(vocab.keys())  
+vocab = sorted(vocab.keys())
 # Reserve 0 for masking via pad_sequences
 vocab_size = len(vocab) + 1
 word_index = dict((c, i + 1) for i, c in enumerate(vocab))
@@ -242,7 +183,7 @@ tYBegin = tYBegin[randindex, :]
 tYEnd = tYEnd[randindex, :]
 
 # vX: validation Context, vXq: validation Question
-vX, vXq = vectorizeValData(vContext, vQuestion, word_index, context_maxlen, question_maxlen)
+vX, vXq, vYBegin, vYEnd = vectorizeData(vContext, vQuestion, vAnswerBegin, vAnswerEnd, word_index, context_maxlen, question_maxlen)
 print('Vectoring process completed.')
 
 print('tX.shape = {}'.format(tX.shape))
@@ -313,23 +254,15 @@ predictions = model.predict([vX, vXq], batch_size=64)
 print(predictions[0].shape, predictions[1].shape)
 # make class prediction
 ansBegin = np.zeros((predictions[0].shape[0],), dtype=np.int32)
-ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32) 
+ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32)
 for i in range(predictions[0].shape[0]):
 	ansBegin[i] = predictions[0][i, :].argmax()
 	ansEnd[i] = predictions[1][i, :].argmax()
 print(ansBegin.min(), ansBegin.max(), ansEnd.min(), ansEnd.max())
 
-# extract answer tokens and join them
-answers = {}
-for i in range(len(vQuestion_id)):
-    #print i
-    if ansBegin[i] >= len(vContext[i]):
-        answers[vQuestion_id[i]] = ""
-    elif ansEnd[i] >= len(vContext[i]):
-        answers[vQuestion_id[i]] = vContextOriginal[i][vToken2CharIdx[i][ansBegin[i]]:]
-    else:
-        answers[vQuestion_id[i]] = vContextOriginal[i][vToken2CharIdx[i][ansBegin[i]]:vToken2CharIdx[i][ansEnd[i]]+len(vContext[i][ansEnd[i]])]
-
-# write out answers to json file
-with io.open('./data/predictions.json', 'w', encoding='utf-8') as f:
-    f.write(json.dumps(answers, ensure_ascii=False))
+for i in range(predictions[0].shape[0]):
+    print(' '.join(vQuestion[i]))
+    print('Predicted Answer:', ' '.join(vContext[i][ansBegin[i] : ansEnd[i] + 1]))
+    # print(vAnswerBegin[i], vAnswerEnd[i])
+    print('True Answer:', ' '.join(vContext[i][vAnswerBegin[i] : vAnswerEnd[i] + 1]))
+    print()
