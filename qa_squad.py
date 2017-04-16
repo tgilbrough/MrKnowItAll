@@ -10,25 +10,22 @@ from keras.models import Model
 import data
 
 EMBEDDING_DIM = 50 # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
-TRAINING_DATA_PATH = './data/squad/train_small.json'
-VAL_DATA_PATH = './data/squad/val_small.json'
-
-# Note: Need to download and unzip Glove pre-train model files into same file as this script
-embeddings_index = data.loadGloveModel('./data/glove/glove.6B.' + str(EMBEDDING_DIM) + 'd.txt')
+TRAINING_DATA_PATH = './data/msmarco/train/location.json' #'./data/squad/train_small.json'
+VAL_DATA_PATH = './data/msmarco/dev/location.json'
 
 # load training data, parse, and split
 print('Loading in training data...')
-trainData = data.import_json(TRAINING_DATA_PATH)
-tContext, tQuestion, tQuestionID, tAnswerBegin, tAnswerEnd, tAnswerText, maxLenTContext, maxLenTQuestion = data.splitDatasets(trainData)
+trainData = data.importMsmarco(TRAINING_DATA_PATH)
+tContext, tQuestion, tQuestionID, tAnswerBegin, tAnswerEnd, tAnswerText, maxLenTContext, maxLenTQuestion = data.splitMsmarcoDatasets(trainData)
 
 # load validation data, parse, and split
 print('Loading in validation data...')
-valData = data.import_json(VAL_DATA_PATH)
-vContext, vQuestion, vQuestionID, vAnswerBegin, vAnswerEnd, vAnswerText, maxLenVContext, maxLenVQuestion = data.splitDatasets(valData)
+valData = data.importMsmarco(VAL_DATA_PATH)
+vContext, vQuestion, vQuestionID, vAnswerBegin, vAnswerEnd, vAnswerText, maxLenVContext, maxLenVQuestion = data.splitMsmarcoDatasets(valData)
 
 print('Building vocabulary...')
 # build a vocabular over all training and validation context paragraphs and question words
-vocab = data.build_vocab(tContext + tQuestion + vContext + vQuestion)
+vocab = data.buildVocab(tContext + tQuestion + vContext + vQuestion)
 
 # Reserve 0 for masking via pad_sequences
 vocab_size = len(vocab) + 1
@@ -62,6 +59,9 @@ print('context_maxlen, question_maxlen = {}, {}'.format(context_maxlen, question
 
 print('Preparing embedding matrix.')
 
+# Note: Need to download and unzip Glove pre-train model files into same file as this script
+embeddings_index = data.loadGloveModel('./data/glove/glove.6B.' + str(EMBEDDING_DIM) + 'd.txt')
+
 # prepare embedding matrix
 embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
 for word, i in word_index.items():
@@ -80,19 +80,16 @@ context = Input(shape=(context_maxlen,), dtype='int32')
 encoded_context = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
                             weights=[embedding_matrix],
                             input_length=context_maxlen, trainable=False)(context)
-encoded_context = Dropout(0.3)(encoded_context)
 
 question = Input(shape=(question_maxlen,), dtype='int32')
 encoded_question = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
                              weights=[embedding_matrix],
                              input_length=question_maxlen, trainable=False)(question)
-encoded_question = Dropout(0.3)(encoded_question)
 encoded_question = LSTM(EMBEDDING_DIM)(encoded_question)
 encoded_question = RepeatVector(context_maxlen)(encoded_question)
 
 merged = add([encoded_context, encoded_question])
-merged = LSTM(EMBEDDING_DIM)(merged)
-merged = Dropout(0.3)(merged)
+merged = LSTM(64)(merged)
 
 answerPtrBegin_output = Dense(context_maxlen, activation='softmax')(merged)
 Lmerge = concatenate([merged, answerPtrBegin_output], name='merge2')
@@ -120,10 +117,9 @@ ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32)
 for i in range(predictions[0].shape[0]):
 	ansBegin[i] = predictions[0][i, :].argmax()
 	ansEnd[i] = predictions[1][i, :].argmax()
-print(ansBegin.min(), ansBegin.max(), ansEnd.min(), ansEnd.max())
 
 for i in range(predictions[0].shape[0]):
     print(' '.join(vQuestion[i]))
-    print('Predicted Answer:', ' '.join(vContext[i][ansBegin[i] : ansEnd[i] + 1]))
-    print('True Answer:', ' '.join(vContext[i][vAnswerBegin[i] : vAnswerEnd[i] + 1]))
+    print('Predicted Answer:', ' '.join(vContext[i][ansBegin[i] : ansEnd[i]]))
+    print('True Answer:', ' '.join(vContext[i][vAnswerBegin[i] : vAnswerEnd[i]]))
     print()
