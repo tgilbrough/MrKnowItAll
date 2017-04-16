@@ -17,5 +17,5 @@ by using `pip install -r requirements.txt`.
 ### Downloading Data
 
 Data is stored in the `data` directory and is not under version control.
+There are scripts to download the various datasets.
 
-To download GloVe embeddings, run `download_glove.sh` from the `data` directory.

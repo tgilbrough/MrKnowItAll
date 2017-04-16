@@ -32,8 +32,8 @@ def load_passages(path):
     return passages, selected
 
 
-train_x, train_y = load_passages('ms_marco/dev_1000.json')
-# test_x, test_y = load_passages('ms_marco/test_public_v1.1.json')
+train_x, train_y = load_passages('data/msmarco/dev_v1.1.json')
+# test_x, test_y = load_passages('data/msmarco/test_public_v1.1.json')
 
 n_features = glove.dim * 2
 n_labels = 2
