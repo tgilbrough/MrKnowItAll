@@ -24,7 +24,7 @@ def tokenize(sent):
     '''
     return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
 
-def splitDatasets(f):
+def splitSquadDatasets(f):
     '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
        and keep track of max context and question lengths.
     '''
@@ -63,7 +63,7 @@ def splitDatasets(f):
                     # find indices of beginning/ending words of answer span among tokenized context
                     contextToAnswerFirstWord = context1[:answer['answer_start'] + len(answerTokenized[0])]
                     answerBeginIndex = len(tokenize(contextToAnswerFirstWord.lower())) - 1
-                    answerEndIndex = answerBeginIndex + len(answerTokenized) - 1
+                    answerEndIndex = answerBeginIndex + len(answerTokenized)
 
                     xContext.append(contextTokenized)
                     xQuestion.append(questionTokenized)
@@ -73,6 +73,62 @@ def splitDatasets(f):
                     xAnswerText.append(answerText)
     return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
 
+def splitMsmarcoDatasets(f):
+    '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
+       and keep track of max context and question lengths.
+    '''
+    xContext = [] # list of contexts paragraphs
+    xQuestion = [] # list of questions
+    xQuestion_id = [] # list of question id
+    xAnswerBegin = [] # list of indices of the beginning word in each answer span
+    xAnswerEnd = [] # list of indices of the ending word in each answer span
+    xAnswerText = [] # list of the answer text
+    maxLenContext = 0
+    maxLenQuestion = 0
+
+    # For now only pick out selected passages that have answers directly inside the passage
+    for data in f['data']: 
+        for passage in data['passages']:
+            if passage['is_selected'] == 0:
+                continue
+            context = passage['passage_text']
+            context = context.replace("''", '" ')
+            context = context.replace("``", '" ')
+            contextTokenized = tokenize(context.lower())
+            contextLength = len(contextTokenized)
+            if contextLength > maxLenContext:
+                maxLenContext = contextLength
+
+            question = data['query']
+            question = question.replace("''", '" ')
+            question = question.replace("``", '" ')
+            questionTokenized = tokenize(question.lower())
+            if len(questionTokenized) > maxLenQuestion:
+                maxLenQuestion = len(questionTokenized)
+
+            question_id = data['query_id']
+            
+            for answer in data['answers']:
+                answerTokenized = tokenize(answer.lower())
+                answerBeginIndex, answerEndIndex = findAnswer(contextTokenized, answerTokenized)
+                if answerBeginIndex != None:
+                    xContext.append(contextTokenized)
+                    xQuestion.append(questionTokenized)
+                    xQuestion_id.append(str(question_id))
+                    xAnswerBegin.append(answerBeginIndex)
+                    xAnswerEnd.append(answerEndIndex)
+                    xAnswerText.append(answer)
+                    break
+    return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
+
+def findAnswer(contextTokenized, answerTokenized):
+    contextLen = len(contextTokenized)
+    answerLen = len(answerTokenized)
+    for i in range(contextLen - answerLen + 1):
+        match = sum([1 for j, m in zip(contextTokenized[i:i + answerLen], answerTokenized) if j == m])
+        if match == answerLen:
+            return (i, i + answerLen)
+    return (None, None)
 
 def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, context_maxlen, question_maxlen):
     '''Vectorize the words to their respective index and pad context to max context length and question to max question length.
@@ -89,19 +145,26 @@ def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, con
         y_Begin =  np.zeros(len(xContext[i]))
         y_Begin[xAnswerBeing[i]] = 1
         y_End = np.zeros(len(xContext[i]))
-        y_End[xAnswerEnd[i]] = 1
+        y_End[xAnswerEnd[i] - 1] = 1
         X.append(x)
         Xq.append(xq)
         YBegin.append(y_Begin)
         YEnd.append(y_End)
     return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), pad_sequences(YBegin, maxlen=context_maxlen, padding='post'), pad_sequences(YEnd, maxlen=context_maxlen, padding='post')
 
-def import_json(json_file):
+def importSquad(json_file):
     with open(json_file, encoding='utf-8') as f:
         data = json.load(f)
     return data
 
-def build_vocab(sentences):
+def importMsmarco(json_file):
+    data = {}
+    data['data'] = []
+    with open(json_file, encoding='utf-8') as f:
+        data['data'] = [json.loads(line) for line in f]
+    return data
+
+def buildVocab(sentences):
     '''Accepts a list of list of words. For example, a list of contexts or questions that are tokenized.
        Returns a sorted list of strings that comprise the vocabulary.
     '''
