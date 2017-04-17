@@ -20,6 +20,7 @@ def loadGloveModel(gloveFile):
 
 def createEmbeddingMatrix(embeddings_index, word_index):
     dim_size = len(embeddings_index['a'])
+    # +1 is for <PAD>
     embedding_matrix = np.zeros((len(word_index) + 1, dim_size))
     for word, i in word_index.items():
         embedding_vector = embeddings_index.get(word)
@@ -148,9 +149,9 @@ def findAnswer(contextTokenized, answerTokenized):
             return (i, i + answerLen)
     return (None, None)
 
-def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, context_maxlen, question_maxlen):
-    '''Vectorize the words to their respective index and pad context to max context length and question to max question length.
-       Answers vectors are padded to the max context length as well.
+def vectorizeData(xContext, xQuestion, xAnswerBegin, xAnswerEnd, word_index, context_maxlen, question_maxlen):
+    '''Converts context and question words to their respective index and pad context to max context length 
+       and question to max question length. Convert answers to one-hot vectors of length max context.
     '''
     X = []
     Xq = []
@@ -161,7 +162,7 @@ def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, con
         xq = [word_index[w] for w in xQuestion[i]]
         # map the first and last words of answer span to one-hot representations
         y_Begin =  np.zeros(len(xContext[i]))
-        y_Begin[xAnswerBeing[i]] = 1
+        y_Begin[xAnswerBegin[i]] = 1
         y_End = np.zeros(len(xContext[i]))
         y_End[xAnswerEnd[i] - 1] = 1
         X.append(x)

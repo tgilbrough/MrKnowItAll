@@ -43,7 +43,7 @@ def main():
     vocab = data.buildVocab(tContext + tQuestion + vContext + vQuestion)
 
     # Reserve 0 for masking via pad_sequences
-    vocab_size = len(vocab) + 1
+    config.vocab_size = len(vocab) + 1
     word_index = dict((c, i + 1) for i, c in enumerate(vocab))
     config.max_context_size = max(maxLenTContext, maxLenVContext)
     config.max_ques_size = max(maxLenTQuestion, maxLenVQuestion)
