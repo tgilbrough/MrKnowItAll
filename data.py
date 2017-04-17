@@ -18,6 +18,16 @@ def loadGloveModel(gloveFile):
     print('Found %s word vectors.' % len(embedding_index))
     return embedding_index
 
+def createEmbeddingMatrix(embeddings_index, word_index):
+    dim_size = len(embeddings_index['a'])
+    embedding_matrix = np.zeros((len(word_index) + 1, dim_size))
+    for word, i in word_index.items():
+        embedding_vector = embeddings_index.get(word)
+        if embedding_vector is not None:
+            # words not found in embedding index will be all-zeros.
+            embedding_matrix[i] = embedding_vector 
+    return embedding_matrix
+
 def tokenize(sent):
     '''Return the tokens of a context including punctuation. Wrapper around nltk.word_tokenize to
        fix weird quotation marks.

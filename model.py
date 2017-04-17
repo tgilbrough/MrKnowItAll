@@ -9,8 +9,9 @@ class Model:
         self.dim = config.hidden_size
 
         # embeddings matrix
-        self.emb_mat = tf.slice(config.emb_mat, [2, 0], [-1, -1])
-        self.emb_mat = tf.concat([tf.get_variable('emb_mat', shape=[2, self.dim]), self.emb_mat], axis=0)
+        self.emb_mat = tf.slice(config.emb_mat, [2, 0], [-1, -1]) # Beginning index at 2 because of <UNK> and <PAD>
+        self.emb_mat = tf.to_float(self.emb_mat) # converts from float64 to float32
+        self.emb_mat = tf.concat([tf.get_variable('emb_mat', shape=[2, config.dim_size]), self.emb_mat], axis=0)
 
         self.max_x = config.max_context_size
         self.max_q = config.max_ques_size
