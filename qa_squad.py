@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import json
 
 from keras.layers.embeddings import Embedding
 from keras.layers import Input, Dense, Dropout, RepeatVector, Activation
@@ -12,6 +13,9 @@ import data
 EMBEDDING_DIM = 50 # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
 TRAINING_DATA_PATH = './data/msmarco/train/location.json' #'./data/squad/train_small.json'
 VAL_DATA_PATH = './data/msmarco/dev/location.json'
+
+REFERENCES_PATH = './eval/references.json'
+CANDIDATES_PATH = './eval/candidates.json'
 
 # load training data, parse, and split
 print('Loading in training data...')
@@ -49,14 +53,6 @@ tXq = tXq[randindex, :]
 tYBegin = tYBegin[randindex, :]
 tYEnd = tYEnd[randindex, :]
 
-print('tX.shape = {}'.format(tX.shape))
-print('tXq.shape = {}'.format(tXq.shape))
-print('tYBegin.shape = {}'.format(tYBegin.shape))
-print('tYEnd.shape = {}'.format(tYEnd.shape))
-print('vX.shape = {}'.format(vX.shape))
-print('vXq.shape = {}'.format(vXq.shape))
-print('context_maxlen, question_maxlen = {}, {}'.format(context_maxlen, question_maxlen))
-
 print('Preparing embedding matrix.')
 
 # Note: Need to download and unzip Glove pre-train model files into same file as this script
@@ -74,7 +70,7 @@ for word, i in word_index.items():
 CONTEXT_HIDDEN_SIZE = 100
 QUERY_HIDDEN_SIZE = 100
 BATCH_SIZE = 256
-EPOCHS = 100
+EPOCHS = 1
 
 context = Input(shape=(context_maxlen,), dtype='int32')
 encoded_context = Embedding(output_dim=EMBEDDING_DIM, input_dim=vocab_size,
@@ -110,7 +106,6 @@ model.fit([tX, tXq], [tYBegin, tYEnd],
           verbose=1)
 predictions = model.predict([vX, vXq], batch_size=64)
 
-print(predictions[0].shape, predictions[1].shape)
 # make class prediction
 ansBegin = np.zeros((predictions[0].shape[0],), dtype=np.int32)
 ansEnd = np.zeros((predictions[0].shape[0],),dtype=np.int32)
@@ -118,8 +113,4 @@ for i in range(predictions[0].shape[0]):
 	ansBegin[i] = predictions[0][i, :].argmax()
 	ansEnd[i] = predictions[1][i, :].argmax()
 
-for i in range(predictions[0].shape[0]):
-    print(' '.join(vQuestion[i]))
-    print('Predicted Answer:', ' '.join(vContext[i][ansBegin[i] : ansEnd[i]]))
-    print('True Answer:', ' '.join(vContext[i][vAnswerBegin[i] : vAnswerEnd[i]]))
-    print()
+data.saveAnswersForEval(REFERENCES_PATH, CANDIDATES_PATH, vContext, vQuestionID, ansBegin, ansEnd, vAnswerBegin, vAnswerEnd)
