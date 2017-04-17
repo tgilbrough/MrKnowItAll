@@ -7,16 +7,13 @@ class Model:
     def __init__(self, config):
         self.keep_prob = config.keep_prob
         self.dim = config.hidden_size
-
-        # embeddings matrix
-        self.emb_mat = tf.slice(config.emb_mat, [2, 0], [-1, -1]) # Beginning index at 2 because of <UNK> and <PAD>
-        self.emb_mat = tf.to_float(self.emb_mat) # converts from float64 to float32
-        self.emb_mat = tf.concat([tf.get_variable('emb_mat', shape=[2, config.dim_size]), self.emb_mat], axis=0)
-
         self.max_x = config.max_context_size
         self.max_q = config.max_ques_size
 
-    def compute(self, x, x_len, q, q_len):
+    def compute(self, x, x_len, q, q_len, embeddings):
+        # embeddings matrix, may be memory ineffecient (Fix)
+        emb_mat = tf.get_variable(name="emb_mat", shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
+        
         # tensor of boolean values of max_x length and True in first x_len indices
         x_mask = tf.sequence_mask(x_len, self.max_x)
         q_mask = tf.sequence_mask(q_len, self.max_q)
