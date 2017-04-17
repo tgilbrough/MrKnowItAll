@@ -108,17 +108,25 @@ def splitMsmarcoDatasets(f):
 
             question_id = data['query_id']
             
+            answerFound = False
+
             for answer in data['answers']:
                 answerTokenized = tokenize(answer.lower())
                 answerBeginIndex, answerEndIndex = findAnswer(contextTokenized, answerTokenized)
                 if answerBeginIndex != None:
                     xContext.append(contextTokenized)
                     xQuestion.append(questionTokenized)
-                    xQuestion_id.append(str(question_id))
+                    xQuestion_id.append(question_id)
                     xAnswerBegin.append(answerBeginIndex)
                     xAnswerEnd.append(answerEndIndex)
                     xAnswerText.append(answer)
+                    answerFound = True
                     break
+
+            if answerFound:
+                answerFound = False
+                break
+
     return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
 
 def findAnswer(contextTokenized, answerTokenized):
@@ -151,6 +159,28 @@ def vectorizeData(xContext, xQuestion, xAnswerBeing, xAnswerEnd, word_index, con
         YBegin.append(y_Begin)
         YEnd.append(y_End)
     return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), pad_sequences(YBegin, maxlen=context_maxlen, padding='post'), pad_sequences(YEnd, maxlen=context_maxlen, padding='post')
+
+def saveAnswersForEval(referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
+    rf = open(referencesPath, 'w', encoding='utf-8')
+    cf = open(candidatesPath, 'w', encoding='utf-8')
+
+    for i in range(len(vContext)):
+        predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i]])
+        trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i]])
+        
+        reference = {}
+        candidate = {}
+        reference['query_id'] = vQuestionID[i]
+        reference['answers'] = [trueAnswer]
+
+        candidate['query_id'] = vQuestionID[i]
+        candidate['answers'] = [predictedAnswer]
+
+        print(json.dumps(reference), file=rf)
+        print(json.dumps(candidate), file=cf)
+
+    rf.close()
+    cf.close()
 
 def importSquad(json_file):
     with open(json_file, encoding='utf-8') as f:
