@@ -62,7 +62,9 @@ class Model:
             xq_fw, xq_bw = outputs_xq
             xq_output = tf.concat([xq_fw, xq_bw], axis=2)
 
+        # Get rid of the sequence dimension
         xq_flat = tf.reshape(xq_output, [-1, 2 * self.dim])
+        print(xq_flat.get_shape())
 
         # logits
         with tf.variable_scope('start'):
