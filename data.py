@@ -50,7 +50,8 @@ class Data:
         print('Vectoring process completed.')
 
         self.num_examples = len(tX)
-        self.all_data = {'tX': tX, 'tXq': tXq, 'tYBegin': tYBegin, 'tYEnd': tYEnd,
+        self.all_data = {'tContext': tContext, 'tQuestion': tQuestion,
+                         'tX': tX, 'tXq': tXq, 'tYBegin': tYBegin, 'tYEnd': tYEnd,
                          'vX': vX, 'vXq': vXq, 'vYBegin': vYBegin, 'vYEnd': vYEnd,
                          'embeddings': embeddings}
 
@@ -65,16 +66,16 @@ class Data:
         assert len(self.all_data['tX']) == len(self.all_data['tYBegin'])
         assert len(self.all_data['tX']) == len(self.all_data['tYEnd'])
         points = np.random.choice(len(self.all_data['tX']), self.batch_size)
+        tContext_batch = np.array(self.all_data['tContext'])[points]
+        tQuestion_batch = np.array(self.all_data['tQuestion'])[points]
         tX_batch = np.array(self.all_data['tX'])[points]
-        tXq_batch = np.array(self.all_data['tX'])[points]
-        tYBegin_batch = np.array(self.all_data['tX'])[points]
-        tYEnd_batch = np.array(self.all_data['tX'])[points]
+        tXq_batch = np.array(self.all_data['tXq'])[points]
+        tYBegin_batch = np.array(self.all_data['tYBegin'])[points]
+        tYEnd_batch = np.array(self.all_data['tYEnd'])[points]
 
-        return {'tX': tX_batch.tolist(), 'tXq': tXq_batch.tolist(),
-                'tYBegin': tYBegin_batch.tolist(), 'tYEnd': tYEnd_batch.tolist()}
-
-
-
+        return {'tContext': tContext_batch, 'tQuestion': tQuestion_batch,
+                'tX': tX_batch, 'tXq': tXq_batch,
+                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
 
     def loadGloveModel(self, gloveFile):
         print("Loading Glove Model...")
@@ -105,55 +106,6 @@ class Data:
            fix weird quotation marks.
         '''
         return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
-
-    def splitSquadDatasets(self, f):
-        '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
-           and keep track of max context and question lengths.
-        '''
-        xContext = [] # list of contexts paragraphs
-        xQuestion = [] # list of questions
-        xQuestion_id = [] # list of question id
-        xAnswerBegin = [] # list of indices of the beginning word in each answer span
-        xAnswerEnd = [] # list of indices of the ending word in each answer span
-        xAnswerText = [] # list of the answer text
-        maxLenContext = 0
-        maxLenQuestion = 0
-
-        for data in f['data']:
-            paragraphs = data['paragraphs']
-            for paragraph in paragraphs:
-                context = paragraph['context']
-                context1 = context.replace("''", '" ')
-                context1 = context1.replace("``", '" ')
-                contextTokenized = self.tokenize(context.lower())
-                contextLength = len(contextTokenized)
-                if contextLength > maxLenContext:
-                    maxLenContext = contextLength
-                qas = paragraph['qas']
-                for qa in qas:
-                    question = qa['question']
-                    question = question.replace("''", '" ')
-                    question = question.replace("``", '" ')
-                    questionTokenized = self.tokenize(question.lower())
-                    if len(questionTokenized) > maxLenQuestion:
-                        maxLenQuestion = len(questionTokenized)
-                    question_id = qa['id']
-                    answers = qa['answers']
-                    for answer in answers:
-                        answerText = answer['text']
-                        answerTokenized = self.tokenize(answerText.lower())
-                        # find indices of beginning/ending words of answer span among tokenized context
-                        contextToAnswerFirstWord = context1[:answer['answer_start'] + len(answerTokenized[0])]
-                        answerBeginIndex = len(self.tokenize(contextToAnswerFirstWord.lower())) - 1
-                        answerEndIndex = answerBeginIndex + len(answerTokenized)
-
-                        xContext.append(contextTokenized)
-                        xQuestion.append(questionTokenized)
-                        xQuestion_id.append(str(question_id))
-                        xAnswerBegin.append(answerBeginIndex)
-                        xAnswerEnd.append(answerEndIndex)
-                        xAnswerText.append(answerText)
-        return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
 
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
@@ -261,11 +213,6 @@ class Data:
 
         rf.close()
         cf.close()
-
-    def importSquad(self, json_file):
-        with open(json_file, encoding='utf-8') as f:
-            data = json.load(f)
-        return data
 
     def importMsmarco(self, json_file):
         data = {}

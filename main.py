@@ -16,7 +16,8 @@ def get_parser():
     parser.add_argument('--reference_path', default='./eval/references.json')
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', default=100)
-    parser.add_argument('--batch_size', default=128)
+    parser.add_argument('--batch_size', default=64)
+    parser.add_argument('--learning_rate', default=0.5)
 
     return parser
 
@@ -39,7 +40,7 @@ def main():
     q = tf.placeholder(tf.int32, shape=[data.batch_size, tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
 
-    outputs = model.compute(x, x_len, q, q_len, embeddings)
+    outputs = model.build(x, x_len, q, q_len, embeddings)
 
     # Place holder for just index of answer within context  
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
@@ -52,13 +53,13 @@ def main():
     acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'))
     acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'))
 
-    train_step = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
+    train_step = tf.train.GradientDescentOptimizer(config.learning_rate).minimize(loss)
 
     number_of_batches = data.get_num_batches()
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(number_of_batches):
+        for i in range(config.epochs * number_of_batches):
             batch = data.get_batch()
 
             train_step.run(feed_dict={x: batch['tX'],
@@ -68,15 +69,47 @@ def main():
                                     y_begin: batch['tYBegin'],
                                     y_end: batch['tYEnd']})
 
-            train_accuracy = acc1.eval(feed_dict={x: batch['tX'],
-                                    x_len: [config.max_context_size] * data.batch_size,
-                                    q: batch['tXq'],
-                                    q_len: [config.max_ques_size] * data.batch_size,
-                                    y_begin: batch['tYBegin'],
-                                    y_end: batch['tYEnd']})
+            if i % 20 == 0:
+                train_accuracy_begin = acc1.eval(feed_dict={x: batch['tX'],
+                                        x_len: [config.max_context_size] * data.batch_size,
+                                        q: batch['tXq'],
+                                        q_len: [config.max_ques_size] * data.batch_size,
+                                        y_begin: batch['tYBegin'],
+                                        y_end: batch['tYEnd']})
+                train_accuracy_end = acc2.eval(feed_dict={x: batch['tX'],
+                                        x_len: [config.max_context_size] * data.batch_size,
+                                        q: batch['tXq'],
+                                        q_len: [config.max_ques_size] * data.batch_size,
+                                        y_begin: batch['tYBegin'],
+                                        y_end: batch['tYEnd']})
 
-            print('step %d, training accuracy %g' % (i, train_accuracy))
+                print('step %d, beginning accuracy %g end accuracy %g' % (i, train_accuracy_begin, train_accuracy_end))
 
+
+        # Print out answers for one of the batches
+        batch = data.get_batch()
+
+        prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
+        prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
+
+
+        begin = prediction_begin.eval(feed_dict={x: batch['tX'],
+                                                x_len: [config.max_context_size] * data.batch_size,
+                                                q: batch['tXq'],
+                                                q_len: [config.max_ques_size] * data.batch_size,
+                                                y_begin: batch['tYBegin'],
+                                                y_end: batch['tYEnd']})
+
+        end = prediction_end.eval(feed_dict={x: batch['tX'],
+                                             x_len: [config.max_context_size] * data.batch_size,
+                                             q: batch['tXq'],
+                                             q_len: [config.max_ques_size] * data.batch_size,
+                                             y_begin: batch['tYBegin'],
+                                             y_end: batch['tYEnd']})
+        for j in range(len(begin)):
+            print(batch['tQuestion'][j])
+            print(batch['tContext'][j][begin[j] : end[j] + 1])
+            print()
 
 if __name__ == "__main__":
     main()
