@@ -229,8 +229,8 @@ class Data:
         cf = open(candidatesPath, 'w', encoding='utf-8')
 
         for i in range(len(vContext)):
-            predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i]])
-            trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i]])
+            predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
+            trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
 
             reference = {}
             candidate = {}
