@@ -50,7 +50,7 @@ def main():
 
     # Note: Need to download and unzip Glove pre-train model files into same file as this script
     embeddings_index = data.loadGloveModel('./data/glove/glove.6B.' + str(config.dim_size) + 'd.txt')
-    config.emb_mat = data.createEmbeddingMatrix(embeddings_index, word_index)
+    embeddings = data.createEmbeddingMatrix(embeddings_index, word_index)
 
     # vectorize training and validation datasets
     print('Begin vectoring process...')
@@ -62,6 +62,36 @@ def main():
     print('Vectoring process completed.')
 
     model = Model(config)
+
+    # shape = batch_size by num_features
+    x = tf.placeholder(tf.int32, shape=[None, tX[0].shape[0]], name='x')
+    x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
+    q = tf.placeholder(tf.int32, shape=[None, tXq[0].shape[0]], name='q')
+    q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
+
+    outputs = model.compute(x, x_len, q, q_len, embeddings)
+
+    y_begin = tf.placeholder(tf.int32, [None, config.max_context_size])
+    y_end = tf.placeholder(tf.int32, [None, config.max_context_size])
+
+    print(type(outputs['yp_start']), outputs['yp_start'].get_shape())
+
+    cross_entropy_begin = tf.reduce_mean(-tf.reduce_sum(y_begin * tf.log(outputs['yp_start']), axis=[1]))
+    cross_entropy_end = tf.reduce_mean(-tf.reduce_sum(y_end * tf.log(outputs['yp_end']), axis=[1]))
+    
+    print(cross_entropy_begin.get_shape())
+    print(cross_entropy_end.get_shape())
+
+    cross_entropy = tf.reduce_mean(cross_entropy_begin + cross_entropy_end)
+
+    train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+
+    with tf.Session() as sess:
+        for _ in range(1000):
+            # Get next batch
+            # train_step.run(feed_dict={x: _, x_len: _, q: _, q_len: _, y_begin: _, y_end: _})
+            continue
+
 
 if __name__ == "__main__":
     main()
