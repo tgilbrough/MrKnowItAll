@@ -18,19 +18,28 @@ class Model:
         x_mask = tf.sequence_mask(x_len, self.max_x)
         q_mask = tf.sequence_mask(q_len, self.max_q)
 
-        context = tf.nn.embedding_lookup(self.emb_mat, x, name='context')
-        question = tf.nn.embedding_lookup(self.emb_mat, q, name='question')
+        context = tf.nn.embedding_lookup(emb_mat, x, name='context')
+        question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
         with tf.variable_scope('pre_process'):
-            cell = GRUCell(self.dim)
-            cell = DropoutWrapper(cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+            gru_c_fw_cell = GRUCell(self.dim)
+            gru_c_fw_cell = DropoutWrapper(gru_c_fw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len)
+            gru_c_bw_cell = GRUCell(self.dim)
+            gru_c_bw_cell = DropoutWrapper(gru_c_bw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_fw_cell, gru_c_bw_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)
 
+            gru_q_fw_cell = GRUCell(self.dim)
+            gru_q_fw_cell = DropoutWrapper(gru_q_fw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+
+            gru_q_bw_cell = GRUCell(self.dim)
+            gru_q_bw_cell = DropoutWrapper(gru_q_bw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+
             tf.get_variable_scope().reuse_variables()
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=question, sequence_length=q_len)
+            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(gru_q_fw_cell, gru_q_bw_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)
 
@@ -43,10 +52,13 @@ class Model:
         xq = tf.concat([context_output, q_avg_tiled, context_output * q_avg_tiled], axis=2)
 
         with tf.variable_scope("post_process"):
-            cell = GRUCell(self.dim)
-            cell = DropoutWrapper(cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+            gru_xq_fw_cell = GRUCell(self.dim)
+            gru_xq_fw_cell = DropoutWrapper(gru_xq_fw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
 
-            outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=xq, sequence_length=x_len)
+            gru_xq_bw_cell = GRUCell(self.dim)
+            gru_xq_bw_cell = DropoutWrapper(gru_xq_bw_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+
+            outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(gru_xq_fw_cell, gru_xq_bw_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw, xq_bw = outputs_xq
             xq_output = tf.concat([xq_fw, xq_bw], axis=2)
 
