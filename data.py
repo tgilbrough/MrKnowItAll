@@ -151,7 +151,7 @@ def findAnswer(contextTokenized, answerTokenized):
 
 def vectorizeData(xContext, xQuestion, xAnswerBegin, xAnswerEnd, word_index, context_maxlen, question_maxlen):
     '''Converts context and question words to their respective index and pad context to max context length 
-       and question to max question length. Convert answers to one-hot vectors of length max context.
+       and question to max question length. *Convert answers to one-hot vectors of length max context.
     '''
     X = []
     Xq = []
@@ -161,15 +161,13 @@ def vectorizeData(xContext, xQuestion, xAnswerBegin, xAnswerEnd, word_index, con
         x = [word_index[w] for w in xContext[i]]
         xq = [word_index[w] for w in xQuestion[i]]
         # map the first and last words of answer span to one-hot representations
-        y_Begin =  np.zeros(len(xContext[i]))
-        y_Begin[xAnswerBegin[i]] = 1
-        y_End = np.zeros(len(xContext[i]))
-        y_End[xAnswerEnd[i] - 1] = 1
+        y_Begin =  xAnswerBegin[i]
+        y_End = xAnswerEnd[i] - 1
         X.append(x)
         Xq.append(xq)
         YBegin.append(y_Begin)
         YEnd.append(y_End)
-    return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), pad_sequences(YBegin, maxlen=context_maxlen, padding='post'), pad_sequences(YEnd, maxlen=context_maxlen, padding='post')
+    return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), YBegin, YEnd
 
 def saveAnswersForEval(referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
     rf = open(referencesPath, 'w', encoding='utf-8')
