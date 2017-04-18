@@ -6,17 +6,16 @@ from data import Data
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    home = "" #os.path.expanduser("~")
-    parser.add_argument('--keep_prob', type=float, default=0.8)
-    parser.add_argument('--hidden_size', type=int, default=100)
-    parser.add_argument('--emb_size', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
+    parser.add_argument('--keep_prob', '-kp', type=float, default=0.8)
+    parser.add_argument('--hidden_size', '-hs', type=int, default=100)
+    parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--train_path', default='./datasets/msmarco/train/location.json')
     parser.add_argument('--val_path', default='./datasets/msmarco/dev/location.json')
     parser.add_argument('--reference_path', default='./eval/references.json')
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', '-e', type=int, default=100)
-    parser.add_argument('--batch_size', '-b', type=int, default=64)
-    parser.add_argument('--learning_rate', '-l', type=float, default=0.5)
+    parser.add_argument('--batch_size', '-bs', type=int, default=64)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.5)
 
     return parser
 
@@ -28,18 +27,14 @@ def main():
 
     model = Model(config)
 
-    tX = data.tX
-    tXq = data.tXq
-    embeddings = data.embeddings
-
     # shape = batch_size by num_features
-    x = tf.placeholder(tf.int32, shape=[None, tX[0].shape[0]], name='x')
+    x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
-    q = tf.placeholder(tf.int32, shape=[None, tXq[0].shape[0]], name='q')
+    q = tf.placeholder(tf.int32, shape=[None, data.tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
-    outputs = model.build(x, x_len, q, q_len, embeddings, keep_prob)
+    outputs = model.build(x, x_len, q, q_len, data.embeddings, keep_prob)
 
     # Place holder for just index of answer within context  
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
