@@ -5,12 +5,11 @@ from tensorflow.contrib.rnn import GRUCell
 
 class Model:
     def __init__(self, config):
-        self.keep_prob = config.keep_prob
         self.dim = config.hidden_size
         self.max_x = config.max_context_size
         self.max_q = config.max_ques_size
 
-    def build(self, x, x_len, q, q_len, embeddings):
+    def build(self, x, x_len, q, q_len, embeddings, keep_prob):
         # embeddings matrix, may be memory ineffecient (Fix)
         emb_mat = tf.get_variable(name="emb_mat", shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
         
@@ -23,14 +22,14 @@ class Model:
 
         with tf.variable_scope('pre_process'):
             gru_c_cell = GRUCell(self.dim)
-            gru_c_cell = DropoutWrapper(gru_c_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+            gru_c_cell = DropoutWrapper(gru_c_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
             outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)
 
             gru_q_cell = GRUCell(self.dim)
-            gru_q_cell = DropoutWrapper(gru_q_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+            gru_q_cell = DropoutWrapper(gru_q_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
             tf.get_variable_scope().reuse_variables()
             outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(gru_q_cell, gru_q_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
@@ -47,7 +46,7 @@ class Model:
 
         with tf.variable_scope("post_process"):
             gru_xq_cell = GRUCell(self.dim)
-            gru_xq_cell = DropoutWrapper(gru_xq_cell, input_keep_prob=self.keep_prob)  # to avoid over-fitting
+            gru_xq_cell = DropoutWrapper(gru_xq_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
             outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(gru_xq_cell, gru_xq_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw, xq_bw = outputs_xq
