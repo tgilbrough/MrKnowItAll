@@ -26,13 +26,12 @@ def main():
     config = parser.parse_args()
 
     data = Data(config)
-    all_data = data.get_all_data()
 
     model = Model(config)
 
-    tX = all_data['tX']
-    tXq = all_data['tXq']
-    embeddings = all_data['embeddings']
+    tX = data.tX
+    tXq = data.tXq
+    embeddings = data.embeddings
 
     # shape = batch_size by num_features
     x = tf.placeholder(tf.int32, shape=[data.batch_size, tX[0].shape[0]], name='x')
@@ -59,8 +58,8 @@ def main():
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(config.epochs * number_of_batches):
-            batch = data.get_batch()
+        for i in range(1):#config.epochs * number_of_batches):
+            batch = data.get_train_batch()
 
             train_step.run(feed_dict={x: batch['tX'],
                                     x_len: [config.max_context_size] * data.batch_size,
@@ -87,28 +86,28 @@ def main():
 
 
         # Print out answers for one of the batches
-        batch = data.get_batch()
+        batch = data.get_val_batch()
 
         prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
         prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
 
 
-        begin = prediction_begin.eval(feed_dict={x: batch['tX'],
+        begin = prediction_begin.eval(feed_dict={x: batch['vX'],
                                                 x_len: [config.max_context_size] * data.batch_size,
-                                                q: batch['tXq'],
+                                                q: batch['vXq'],
                                                 q_len: [config.max_ques_size] * data.batch_size,
-                                                y_begin: batch['tYBegin'],
-                                                y_end: batch['tYEnd']})
+                                                y_begin: batch['vYBegin'],
+                                                y_end: batch['vYEnd']})
 
-        end = prediction_end.eval(feed_dict={x: batch['tX'],
+        end = prediction_end.eval(feed_dict={x: batch['vX'],
                                              x_len: [config.max_context_size] * data.batch_size,
-                                             q: batch['tXq'],
+                                             q: batch['vXq'],
                                              q_len: [config.max_ques_size] * data.batch_size,
-                                             y_begin: batch['tYBegin'],
-                                             y_end: batch['tYEnd']})
+                                             y_begin: batch['vYBegin'],
+                                             y_end: batch['vYEnd']})
         for j in range(len(begin)):
-            print(batch['tQuestion'][j])
-            print(batch['tContext'][j][begin[j] : end[j] + 1])
+            print(batch['vQuestion'][j])
+            print(batch['vContext'][j][begin[j] : end[j] + 1])
             print()
 
 if __name__ == "__main__":
