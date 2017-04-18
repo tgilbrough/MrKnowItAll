@@ -11,8 +11,8 @@ from keras.models import Model
 import data
 
 EMBEDDING_DIM = 50 # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
-TRAINING_DATA_PATH = './data/msmarco/train/location.json' #'./data/squad/train_small.json'
-VAL_DATA_PATH = './data/msmarco/dev/location.json'
+TRAINING_DATA_PATH = './datasets/msmarco/train/location.json' #'./data/squad/train_small.json'
+VAL_DATA_PATH = './datasets/msmarco/dev/location.json'
 
 REFERENCES_PATH = './eval/references.json'
 CANDIDATES_PATH = './eval/candidates.json'
