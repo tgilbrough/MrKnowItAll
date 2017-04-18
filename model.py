@@ -10,7 +10,7 @@ class Model:
         self.max_x = config.max_context_size
         self.max_q = config.max_ques_size
 
-    def compute(self, x, x_len, q, q_len, embeddings):
+    def build(self, x, x_len, q, q_len, embeddings):
         # embeddings matrix, may be memory ineffecient (Fix)
         emb_mat = tf.get_variable(name="emb_mat", shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
         
