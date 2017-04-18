@@ -72,8 +72,8 @@ def main():
     outputs = model.compute(x, x_len, q, q_len, embeddings)
 
     # Place holder for just index of answer within context  
-    y_begin = tf.placeholder(tf.int32, [None])
-    y_end = tf.placeholder(tf.int32, [None])
+    y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
+    y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
     logits1, logits2 = outputs['logits_start'], outputs['logits_end']
     loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1))
@@ -85,10 +85,22 @@ def main():
     train_step = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
 
     with tf.Session() as sess:
-        for _ in range(1000):
-            # Get next batch
-            # train_step.run(feed_dict={x: _, x_len: _, q: _, q_len: _, y_begin: _, y_end: _})
-            continue
+        sess.run(tf.global_variables_initializer())
+        for i in range(len(tX)):
+            train_step.run(feed_dict={x: tX[i : i + 1], 
+                                    x_len: [config.max_context_size], 
+                                    q: tXq[i: i + 1], 
+                                    q_len: [config.max_ques_size], 
+                                    y_begin: tYBegin[i : i + 1],
+                                    y_end: tYEnd[i : i + 1]})
+                                    
+            train_accuracy = acc1.eval(feed_dict={x: tX[i : i + 1], 
+                                    x_len: [config.max_context_size], 
+                                    q: tXq[i: i + 1], 
+                                    q_len: [config.max_ques_size], 
+                                    y_begin: tYBegin[i : i + 1],
+                                    y_end: tYEnd[i : i + 1]})
+            print('step %d, training accuracy %g' % (i, train_accuracy))
 
 
 if __name__ == "__main__":
