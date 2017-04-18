@@ -8,6 +8,8 @@ def get_parser():
     parser.add_argument('--train_dir', default='./train/')
     parser.add_argument('--dev_path', default='./dev_v1.1.json')
     parser.add_argument('--dev_dir', default='./dev/')
+    parser.add_argument('--test_path', default='./test_public_v1.1.json')
+    parser.add_argument('--test_dir', default='./test/')
     
     return parser
 
@@ -39,6 +41,7 @@ def main():
 
     split(config.train_path, config.train_dir)
     split(config.dev_path, config.dev_dir)
+    split(config.test_path, config.test_dir)
 
 if __name__ == "__main__":
     main()
