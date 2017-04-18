@@ -34,9 +34,9 @@ def main():
     embeddings = all_data['embeddings']
 
     # shape = batch_size by num_features
-    x = tf.placeholder(tf.int32, shape=[None, tX[0].shape[0]], name='x')
+    x = tf.placeholder(tf.int32, shape=[data.batch_size, tX[0].shape[0]], name='x')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
-    q = tf.placeholder(tf.int32, shape=[None, tXq[0].shape[0]], name='q')
+    q = tf.placeholder(tf.int32, shape=[data.batch_size, tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
 
     outputs = model.compute(x, x_len, q, q_len, embeddings)
@@ -62,16 +62,16 @@ def main():
             batch = data.get_batch()
 
             train_step.run(feed_dict={x: batch['tX'],
-                                    x_len: [config.max_context_size],
+                                    x_len: [config.max_context_size] * data.batch_size,
                                     q: batch['tXq'],
-                                    q_len: [config.max_ques_size],
+                                    q_len: [config.max_ques_size] * data.batch_size,
                                     y_begin: batch['tYBegin'],
                                     y_end: batch['tYEnd']})
 
             train_accuracy = acc1.eval(feed_dict={x: batch['tX'],
-                                    x_len: [config.max_context_size],
+                                    x_len: [config.max_context_size] * data.batch_size,
                                     q: batch['tXq'],
-                                    q_len: [config.max_ques_size],
+                                    q_len: [config.max_ques_size] * data.batch_size,
                                     y_begin: batch['tYBegin'],
                                     y_end: batch['tYEnd']})
 

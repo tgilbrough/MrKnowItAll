@@ -51,7 +51,8 @@ class Data:
 
         self.num_examples = len(tX)
         self.all_data = {'tX': tX, 'tXq': tXq, 'tYBegin': tYBegin, 'tYEnd': tYEnd,
-                         'vX': vX, 'vXq': vXq, 'vYBegin': vYBegin, 'vYEnd': vYEnd}
+                         'vX': vX, 'vXq': vXq, 'vYBegin': vYBegin, 'vYEnd': vYEnd,
+                         'embeddings': embeddings}
 
     def get_all_data(self):
         return self.all_data
@@ -69,8 +70,8 @@ class Data:
         tYBegin_batch = np.array(self.all_data['tX'])[points]
         tYEnd_batch = np.array(self.all_data['tX'])[points]
 
-        return {'tX_batch': tX_batch, 'tXq_batch': tXq_batch,
-                'tYBegin_batch': tYBegin_batch, 'tYEnd_batch': tYEnd_batch}
+        return {'tX': tX_batch.tolist(), 'tXq': tXq_batch.tolist(),
+                'tYBegin': tYBegin_batch.tolist(), 'tYEnd': tYEnd_batch.tolist()}
 
 
 

@@ -1,4 +1,5 @@
-data/msmarco
-data/glove
+datasets/msmarco
+datasets/glove
 venv
 .idea/
+__pycache__/
