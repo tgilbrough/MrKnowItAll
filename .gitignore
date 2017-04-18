@@ -1,3 +1,4 @@
 data/msmarco
 data/glove
 venv
+.idea/

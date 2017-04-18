@@ -4,7 +4,7 @@ nltk.download('punkt')
 
 
 class Glove:
-    def __init__(self, path='data/glove/glove.6B.50d.txt'):
+    def __init__(self, path='datasets/glove/glove.6B.50d.txt'):
         "Load GloVe embeddings from the given file."
 
         print('Loading GloVe embeddings from {}...'.format(path))
