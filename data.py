@@ -5,10 +5,11 @@ nltk.download('punkt')
 
 from keras.preprocessing.sequence import pad_sequences
 
-
 class Data:
     def __init__(self, config):
         self.batch_size = config.batch_size
+        self.train_batch_count = 0
+        self.val_batch_count = 0
 
         print('Preparing embedding matrix.')
 
@@ -35,7 +36,7 @@ class Data:
         config.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
-        embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.dim_size) + 'd.txt')
+        embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
         self.embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
 
         # vectorize training and validation datasets
@@ -49,44 +50,63 @@ class Data:
                                                      config.max_context_size, config.max_ques_size)
         print('Vectorizing process completed.')
 
-        self.num_examples = len(self.tX)
-
-    def get_all_data(self):
+    def getAllData(self):
         return self.all_data
 
-    def get_num_batches(self):
-        return int(math.ceil(self.num_examples / self.batch_size))
+    def getNumTrainBatches(self):
+        return int(math.ceil(len(self.tX) / self.batch_size))
 
-    def get_train_batch(self):
+    def getNumValBatches(self):
+        return int(math.ceil(len(self.vX) / self.batch_size))
+
+    def getTrainBatch(self):
         assert len(self.tX) == len(self.tXq)
         assert len(self.tX) == len(self.tYBegin)
         assert len(self.tX) == len(self.tYEnd)
+
         points = np.random.choice(len(self.tX), self.batch_size)
-        tContext_batch = np.array(self.tContext)[points]
-        tQuestion_batch = np.array(self.tQuestion)[points]
-        tX_batch = np.array(self.tX)[points]
-        tXq_batch = np.array(self.tXq)[points]
-        tYBegin_batch = np.array(self.tYBegin)[points]
-        tYEnd_batch = np.array(self.tYEnd)[points]
+
+        start_index = self.batch_size * self.train_batch_count
+        end_index = min(self.batch_size * (self.train_batch_count + 1), len(self.tX))
+        tContext_batch = self.tContext[start_index : end_index]
+        tQuestion_batch = self.tQuestion[start_index : end_index]
+        tQuestionID_batch = self.tQuestionID[start_index : end_index]
+        tX_batch = self.tX[start_index : end_index]
+        tXq_batch = self.tXq[start_index : end_index]
+        tYBegin_batch = self.tYBegin[start_index : end_index]
+        tYEnd_batch = self.tYEnd[start_index : end_index]
+
+        self.train_batch_count += 1
+        if self.train_batch_count == self.getNumTrainBatches():
+            self.train_batch_count = 0
 
         return {'tContext': tContext_batch, 'tQuestion': tQuestion_batch,
-                'tX': tX_batch, 'tXq': tXq_batch,
+                'tQuestionID': tQuestionID_batch, 'tX': tX_batch, 'tXq': tXq_batch,
                 'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
 
-    def get_val_batch(self):
+    def getValBatch(self):
         assert len(self.vX) == len(self.vXq)
         assert len(self.vX) == len(self.vYBegin)
         assert len(self.vX) == len(self.vYEnd)
+
         points = np.random.choice(len(self.vX), self.batch_size)
-        vContext_batch = np.array(self.vContext)[points]
-        vQuestion_batch = np.array(self.vQuestion)[points]
-        vX_batch = np.array(self.vX)[points]
-        vXq_batch = np.array(self.vXq)[points]
-        vYBegin_batch = np.array(self.vYBegin)[points]
-        vYEnd_batch = np.array(self.vYEnd)[points]
+
+        start_index = self.batch_size * self.val_batch_count
+        end_index = min(self.batch_size * (self.val_batch_count + 1), len(self.vX))
+        vContext_batch = self.vContext[start_index : end_index]
+        vQuestion_batch = self.vQuestion[start_index : end_index]
+        vQuestionID_batch = self.vQuestionID[start_index : end_index]
+        vX_batch = self.vX[start_index : end_index]
+        vXq_batch = self.vXq[start_index : end_index]
+        vYBegin_batch = self.vYBegin[start_index : end_index]
+        vYEnd_batch = self.vYEnd[start_index : end_index]
+
+        self.val_batch_count += 1
+        if self.val_batch_count == self.getNumValBatches():
+            self.val_batch_count = 0
 
         return {'vContext': vContext_batch, 'vQuestion': vQuestion_batch,
-                'vX': vX_batch, 'vXq': vXq_batch,
+                'vQuestionID': vQuestionID_batch, 'vX': vX_batch, 'vXq': vXq_batch,
                 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def loadGloveModel(self, gloveFile):
