@@ -1,12 +1,13 @@
 import argparse
 import tensorflow as tf
+from tqdm import tqdm
 
 from model import Model
 from data import Data
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--keep_prob', '-kp', type=float, default=0.8)
+    parser.add_argument('--keep_prob', '-kp', type=float, default=0.7)
     parser.add_argument('--hidden_size', '-hs', type=int, default=100)
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--train_path', default='./datasets/msmarco/train/location.json')
@@ -56,7 +57,7 @@ def main():
         sess.run(tf.global_variables_initializer())
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
-            for i in range(number_of_train_batches):
+            for i in tqdm(range(number_of_train_batches)):
                 batch = data.getTrainBatch()
 
                 train_step.run(feed_dict={x: batch['tX'],
@@ -67,16 +68,17 @@ def main():
                                         y_end: batch['tYEnd'], 
                                         keep_prob: config.keep_prob})
 
-                if i % 20 == 0:
-                    acc_begin, acc_end = sess.run([acc1, acc2], feed_dict={x: batch['tX'],
-                                            x_len: [config.max_context_size] * len(batch['tX']),
-                                            q: batch['tXq'],
-                                            q_len: [config.max_ques_size] * len(batch['tX']),
-                                            y_begin: batch['tYBegin'],
-                                            y_end: batch['tYEnd'],
-                                            keep_prob: 1.0})
+            acc_begin, acc_end = sess.run([acc1, acc2], feed_dict={x: batch['tX'],
+                                    x_len: [config.max_context_size] * len(batch['tX']),
+                                    q: batch['tXq'],
+                                    q_len: [config.max_ques_size] * len(batch['tX']),
+                                    y_begin: batch['tYBegin'],
+                                    y_end: batch['tYEnd'],
+                                    keep_prob: 1.0})
 
-                    print('step {}, beginning accuracy {} end accuracy {}'.format(i, acc_begin, acc_end))
+            print('beginning accuracy: {}'.format(acc_begin))
+            print('end accuracy {}'.format(acc_end))
+            print()
 
 
         # Print out answers for one of the batches
