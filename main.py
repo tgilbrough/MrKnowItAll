@@ -37,8 +37,9 @@ def main():
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
     q = tf.placeholder(tf.int32, shape=[None, tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
+    keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
-    outputs = model.build(x, x_len, q, q_len, embeddings)
+    outputs = model.build(x, x_len, q, q_len, embeddings, keep_prob)
 
     # Place holder for just index of answer within context  
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
@@ -68,7 +69,8 @@ def main():
                                         q: batch['tXq'],
                                         q_len: [config.max_ques_size] * len(batch['tX']),
                                         y_begin: batch['tYBegin'],
-                                        y_end: batch['tYEnd']})
+                                        y_end: batch['tYEnd'], 
+                                        keep_prob: config.keep_prob})
 
                 if i % 20 == 0:
                     acc_begin, acc_end = sess.run([acc1, acc2], feed_dict={x: batch['tX'],
@@ -76,7 +78,8 @@ def main():
                                             q: batch['tXq'],
                                             q_len: [config.max_ques_size] * len(batch['tX']),
                                             y_begin: batch['tYBegin'],
-                                            y_end: batch['tYEnd']})
+                                            y_end: batch['tYEnd'],
+                                            keep_prob: 1.0})
 
                     print('step {}, beginning accuracy {} end accuracy {}'.format(i, acc_begin, acc_end))
 
@@ -94,20 +97,14 @@ def main():
             prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
             prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
 
-
-            begin = prediction_begin.eval(feed_dict={x: batch['vX'],
+            begin, end = sess.run([prediction_begin, prediction_end], feed_dict={x: batch['vX'],
                                                     x_len: [config.max_context_size] * len(batch['vX']),
                                                     q: batch['vXq'],
                                                     q_len: [config.max_ques_size] * len(batch['vX']),
                                                     y_begin: batch['vYBegin'],
-                                                    y_end: batch['vYEnd']})
+                                                    y_end: batch['vYEnd'], 
+                                                    keep_prob: 1.0})
 
-            end = prediction_end.eval(feed_dict={x: batch['vX'],
-                                                    x_len: [config.max_context_size] * len(batch['vX']),
-                                                    q: batch['vXq'],
-                                                    q_len: [config.max_ques_size] * len(batch['vX']),
-                                                    y_begin: batch['vYBegin'],
-                                                    y_end: batch['vYEnd']})
             for j in range(len(begin)):
                 vContext.append(batch['vContext'][j])
                 vQuestionID.append(batch['vQuestionID'][j])
