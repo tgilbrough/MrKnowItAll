@@ -71,20 +71,18 @@ def main():
 
     outputs = model.compute(x, x_len, q, q_len, embeddings)
 
-    y_begin = tf.placeholder(tf.int32, [None, config.max_context_size])
-    y_end = tf.placeholder(tf.int32, [None, config.max_context_size])
+    # Place holder for just index of answer within context  
+    y_begin = tf.placeholder(tf.int32, [None])
+    y_end = tf.placeholder(tf.int32, [None])
 
-    print(type(outputs['yp_start']), outputs['yp_start'].get_shape())
+    logits1, logits2 = outputs['logits_start'], outputs['logits_end']
+    loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1))
+    loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2))
+    loss = loss1 + loss2
+    acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'))
+    acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'))
 
-    cross_entropy_begin = tf.reduce_mean(-tf.reduce_sum(y_begin * tf.log(outputs['yp_start']), axis=[1]))
-    cross_entropy_end = tf.reduce_mean(-tf.reduce_sum(y_end * tf.log(outputs['yp_end']), axis=[1]))
-    
-    print(cross_entropy_begin.get_shape())
-    print(cross_entropy_end.get_shape())
-
-    cross_entropy = tf.reduce_mean(cross_entropy_begin + cross_entropy_end)
-
-    train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+    train_step = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
 
     with tf.Session() as sess:
         for _ in range(1000):
