@@ -2,7 +2,7 @@ import argparse
 import tensorflow as tf
 from tqdm import tqdm
 
-from model import Model
+from baseline import Model
 from data import Data
 
 def get_parser():
