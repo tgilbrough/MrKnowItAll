@@ -45,19 +45,25 @@ def main():
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    logits1, logits2 = outputs['logits_start'], outputs['logits_end']
-    loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1))
-    loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2))
-    loss = loss1 + loss2
-    acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'))
-    acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'))
+    with tf.variable_scope("loss"):
+        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
+        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
+        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
+        loss = loss1 + loss2
+    with tf.variable_scope("accuracy"):
+        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
+        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
 
     train_step = tf.train.GradientDescentOptimizer(config.learning_rate).minimize(loss)
 
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
 
+    # For tensorboard
+    writer = tf.summary.FileWriter('./tensorboard_models/' + model.model_name)
+    
     with tf.Session() as sess:
+        writer.add_graph(sess.graph)
         sess.run(tf.global_variables_initializer())
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
