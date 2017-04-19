@@ -6,7 +6,7 @@ val_path: ./datasets/msmarco/dev/person.json
 epochs: 20
 batch_size: 64
 learning_rate: 0.5
-model_file: model.py
+model_file: baseline.py
 date: 4/18/2017 5:30pm
 val_begin_acc: 0.4393063583815029
 val_end_acc: 0.4161849710982659
