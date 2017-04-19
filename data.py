@@ -225,8 +225,8 @@ class Data:
         return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), YBegin, YEnd
 
     def saveAnswersForEval(self, referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
-        rf = open(referencesPath, 'w')
-        cf = open(candidatesPath, 'w')
+        rf = open(referencesPath, 'w', encoding='utf-8')
+        cf = open(candidatesPath, 'w', encoding='utf-8')
 
         for i in range(len(vContext)):
             predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
@@ -240,8 +240,8 @@ class Data:
             candidate['query_id'] = vQuestionID[i]
             candidate['answers'] = [predictedAnswer]
 
-            print(json.dumps(reference), file=rf)
-            print(json.dumps(candidate), file=cf)
+            print(json.dumps(reference, ensure_ascii=False), file=rf)
+            print(json.dumps(candidate, ensure_ascii=False), file=cf)
 
         rf.close()
         cf.close()
