@@ -4,11 +4,11 @@ from tensorflow.contrib.rnn import GRUCell
 
 
 class Model:
-    def __init__(self, config):
+    def __init__(self, config, max_x, max_q):
         self.model_name = 'baseline'
         self.dim = config.hidden_size
-        self.max_x = config.max_context_size
-        self.max_q = config.max_ques_size
+        self.max_x = max_x
+        self.max_q = max_q
 
     def build(self, x, x_len, q, q_len, embeddings, keep_prob):
         with tf.variable_scope('embedding_matrix'):
@@ -48,7 +48,7 @@ class Model:
 
         xq = tf.concat([context_output, q_avg_tiled, context_output * q_avg_tiled], axis=2)
 
-        with tf.variable_scope("post_process"):
+        with tf.variable_scope('post_process'):
             gru_xq_cell = GRUCell(self.dim)
             gru_xq_cell = DropoutWrapper(gru_xq_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 

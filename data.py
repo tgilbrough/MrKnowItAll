@@ -30,10 +30,10 @@ class Data:
         vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
-        config.vocab_size = len(vocab) + 1
+        self.vocab_size = len(vocab) + 1
         word_index = dict((c, i + 1) for i, c in enumerate(vocab))
-        config.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
-        config.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
+        self.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
+        self.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
@@ -45,9 +45,9 @@ class Data:
         # tX: training Context, tXq: training Question, tYBegin: training Answer Begin ptr,
         # tYEnd: training Answer End ptr
         self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion, self.tAnswerBegin, self.tAnswerEnd, word_index,
-                                                     config.max_context_size, config.max_ques_size)
+                                                     self.max_context_size, self.max_ques_size)
         self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, self.vAnswerBegin, self.vAnswerEnd, word_index,
-                                                     config.max_context_size, config.max_ques_size)
+                                                     self.max_context_size, self.max_ques_size)
         print('Vectorizing process completed.')
 
     def getAllData(self):

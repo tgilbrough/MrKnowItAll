@@ -26,7 +26,7 @@ def main():
 
     data = Data(config)
 
-    model = Model(config)
+    model = Model(config, data.max_context_size, data.max_ques_size)
 
     # shape = batch_size by num_features
     x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
@@ -45,12 +45,12 @@ def main():
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    with tf.variable_scope("loss"):
+    with tf.variable_scope('loss'):
         logits1, logits2 = outputs['logits_start'], outputs['logits_end']
         loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
         loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
         loss = loss1 + loss2
-    with tf.variable_scope("accuracy"):
+    with tf.variable_scope('accuracy'):
         acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
         acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
 
@@ -62,33 +62,40 @@ def main():
     # For tensorboard
     writer = tf.summary.FileWriter('./tensorboard_models/' + model.model_name)
     
+    tf.summary.scalar("loss", loss)
+    tf.summary.scalar("loss1", loss1)
+    tf.summary.scalar("loss2", loss2)
+    tf.summary.scalar("accuracy1", acc1)
+    tf.summary.scalar("accuracy2", acc2)
+    merged_summary = tf.summary.merge_all()
+
     with tf.Session() as sess:
         writer.add_graph(sess.graph)
         sess.run(tf.global_variables_initializer())
-        for e in range(config.epochs):
-            print('Epoch {}/{}'.format(e + 1, config.epochs))
-            for i in tqdm(range(number_of_train_batches)):
-                batch = data.getTrainBatch()
+        for i in tqdm(range(config.epochs * number_of_train_batches)):
+            # print('Epoch {}/{}'.format(e + 1, config.epochs))
+            batch = data.getTrainBatch()
 
-                train_step.run(feed_dict={x: batch['tX'],
-                                        x_len: [config.max_context_size] * len(batch['tX']),
-                                        q: batch['tXq'],
-                                        q_len: [config.max_ques_size] * len(batch['tX']),
-                                        y_begin: batch['tYBegin'],
-                                        y_end: batch['tYEnd'], 
-                                        keep_prob: config.keep_prob})
-
-            acc_begin, acc_end = sess.run([acc1, acc2], feed_dict={x: batch['tX'],
-                                    x_len: [config.max_context_size] * len(batch['tX']),
+            sess.run(train_step, feed_dict={x: batch['tX'],
+                                    x_len: [data.max_context_size] * len(batch['tX']),
                                     q: batch['tXq'],
-                                    q_len: [config.max_ques_size] * len(batch['tX']),
+                                    q_len: [data.max_ques_size] * len(batch['tX']),
                                     y_begin: batch['tYBegin'],
-                                    y_end: batch['tYEnd'],
-                                    keep_prob: 1.0})
+                                    y_end: batch['tYEnd'], 
+                                    keep_prob: config.keep_prob})
+            if i % 20 == 0:
+                acc_begin, acc_end, s = sess.run([acc1, acc2, merged_summary], feed_dict={x: batch['tX'],
+                                                                            x_len: [data.max_context_size] * len(batch['tX']),
+                                                                            q: batch['tXq'],
+                                                                            q_len: [data.max_ques_size] * len(batch['tX']),
+                                                                            y_begin: batch['tYBegin'],
+                                                                            y_end: batch['tYEnd'],
+                                                                            keep_prob: 1.0})
+                writer.add_summary(s, i)
 
-            print('beginning accuracy: {}'.format(acc_begin))
-            print('end accuracy {}'.format(acc_end))
-            print()
+            # print('beginning accuracy: {}'.format(acc_begin))
+            # print('end accuracy {}'.format(acc_end))
+            # print()
 
 
         # Print out answers for one of the batches
