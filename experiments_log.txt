@@ -1,0 +1,25 @@
+keep_prob: 0.7
+hidden_size: 100
+emb_size: 50
+train_path: ./datasets/msmarco/train/person.json
+val_path: ./datasets/msmarco/dev/person.json
+epochs: 20
+batch_size: 64
+learning_rate: 0.5
+model_file: model.py
+date: 4/18/2017 5:30pm
+val_begin_acc: 0.4393063583815029
+val_end_acc: 0.4161849710982659
+
+eval_output:
+{'guess': [1830, 1664, 1510, 1421], 'correct': [763, 620, 510, 455], 'testlen': 1830, 'reflen': 1317}
+ratio: 1.3895216400900612
+############################
+bleu_1: 0.4169398907101547
+bleu_2: 0.39414489678739467
+bleu_3: 0.3743705534936456
+bleu_4: 0.36002328546264817
+rouge_l: 0.491962493478
+############################
+
+**********************************************************************************************
