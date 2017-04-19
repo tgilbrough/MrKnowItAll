@@ -35,7 +35,11 @@ def main():
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
+    print('Building tensorflow computation graph...')
+
     outputs = model.build(x, x_len, q, q_len, data.embeddings, keep_prob)
+
+    print('Computation graph completed.')
 
     # Place holder for just index of answer within context  
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
@@ -88,6 +92,11 @@ def main():
         predictedEnd = []
         trueBegin = []
         trueEnd = []
+        
+        begin_corr = 0
+        end_corr = 0
+        total = 0
+
         for i in range(number_of_val_batches):
             batch = data.getValBatch()
 
@@ -109,10 +118,19 @@ def main():
                 predictedEnd.append(end[j])
                 trueBegin.append(batch['vYBegin'][j])
                 trueEnd.append(batch['vYEnd'][j])
+
+                begin_corr += int(begin[j] == batch['vYBegin'][j])
+                end_corr += int(end[j] == batch['vYEnd'][j])
+                total += 1
+
                 #print(batch['vQuestion'][j])
                 #print(batch['vContext'][j][begin[j] : end[j] + 1])
                 #print()
-            
+                
+        print('Validation Data:')
+        print('begin accuracy: {}'.format(float(begin_corr) / total))
+        print('end accuracy: {}'.format(float(end_corr) / total))
+
         data.saveAnswersForEval(config.reference_path, config.candidate_path, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
 
 if __name__ == "__main__":
