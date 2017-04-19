@@ -72,30 +72,34 @@ def main():
     with tf.Session() as sess:
         writer.add_graph(sess.graph)
         sess.run(tf.global_variables_initializer())
-        for i in tqdm(range(config.epochs * number_of_train_batches)):
-            # print('Epoch {}/{}'.format(e + 1, config.epochs))
-            batch = data.getTrainBatch()
+        training_steps_count = 0
+        for e in range(config.epochs):
+            print('Epoch {}/{}'.format(e + 1, config.epochs))
+            for i in tqdm(range(number_of_train_batches)):
+                batch = data.getTrainBatch()
 
-            sess.run(train_step, feed_dict={x: batch['tX'],
-                                    x_len: [data.max_context_size] * len(batch['tX']),
-                                    q: batch['tXq'],
-                                    q_len: [data.max_ques_size] * len(batch['tX']),
-                                    y_begin: batch['tYBegin'],
-                                    y_end: batch['tYEnd'], 
-                                    keep_prob: config.keep_prob})
-            if i % 20 == 0:
-                acc_begin, acc_end, s = sess.run([acc1, acc2, merged_summary], feed_dict={x: batch['tX'],
-                                                                            x_len: [data.max_context_size] * len(batch['tX']),
-                                                                            q: batch['tXq'],
-                                                                            q_len: [data.max_ques_size] * len(batch['tX']),
-                                                                            y_begin: batch['tYBegin'],
-                                                                            y_end: batch['tYEnd'],
-                                                                            keep_prob: 1.0})
-                writer.add_summary(s, i)
+                sess.run(train_step, feed_dict={x: batch['tX'],
+                                        x_len: [data.max_context_size] * len(batch['tX']),
+                                        q: batch['tXq'],
+                                        q_len: [data.max_ques_size] * len(batch['tX']),
+                                        y_begin: batch['tYBegin'],
+                                        y_end: batch['tYEnd'], 
+                                        keep_prob: config.keep_prob})
+                if training_steps_count % 20 == 0:
+                    acc_begin, acc_end, s = sess.run([acc1, acc2, merged_summary], feed_dict={x: batch['tX'],
+                                                                                x_len: [data.max_context_size] * len(batch['tX']),
+                                                                                q: batch['tXq'],
+                                                                                q_len: [data.max_ques_size] * len(batch['tX']),
+                                                                                y_begin: batch['tYBegin'],
+                                                                                y_end: batch['tYEnd'],
+                                                                                keep_prob: 1.0})
+                    writer.add_summary(s, training_steps_count)
 
-            # print('beginning accuracy: {}'.format(acc_begin))
-            # print('end accuracy {}'.format(acc_end))
-            # print()
+                training_steps_count += 1
+
+            print('beginning accuracy: {}'.format(acc_begin))
+            print('end accuracy {}'.format(acc_end))
+            print()
 
 
         # Print out answers for one of the batches
