@@ -5,75 +5,105 @@ nltk.download('punkt')
 
 from keras.preprocessing.sequence import pad_sequences
 
+import tensorflow as tf
 
 class Data:
     def __init__(self, config):
         self.batch_size = config.batch_size
+        self.keep_prob = config.keep_prob
+        self.num_threads = config.num_threads
 
         print('Preparing embedding matrix.')
 
         # load training data, parse, and split
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
-        tContext, tQuestion, tQuestionID, tAnswerBegin, tAnswerEnd, tAnswerText, maxLenTContext, maxLenTQuestion = self.splitMsmarcoDatasets(
-            trainData)
+        self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
+            self.maxLenTContext, self.maxLenTQuestion = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
-        vContext, vQuestion, vQuestionID, vAnswerBegin, vAnswerEnd, vAnswerText, maxLenVContext, maxLenVQuestion = self.splitMsmarcoDatasets(
-            valData)
+        self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
+            self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
         print('Building vocabulary...')
         # build a vocabular over all training and validation context paragraphs and question words
-        vocab = self.buildVocab(tContext + tQuestion + vContext + vQuestion)
+        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
-        config.vocab_size = len(vocab) + 1
+        self.vocab_size = len(vocab) + 1
         word_index = dict((c, i + 1) for i, c in enumerate(vocab))
-        config.max_context_size = max(maxLenTContext, maxLenVContext)
-        config.max_ques_size = max(maxLenTQuestion, maxLenVQuestion)
+        self.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
+        self.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
-        embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.dim_size) + 'd.txt')
-        embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
+        embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
+        self.embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
 
         # vectorize training and validation datasets
-        print('Begin vectoring process...')
+        print('Begin vectorizing process...')
 
         # tX: training Context, tXq: training Question, tYBegin: training Answer Begin ptr,
         # tYEnd: training Answer End ptr
-        tX, tXq, tYBegin, tYEnd = self.vectorizeData(tContext, tQuestion, tAnswerBegin, tAnswerEnd, word_index,
-                                                     config.max_context_size, config.max_ques_size)
-        vX, vXq, vYBegin, vYEnd = self.vectorizeData(vContext, vQuestion, vAnswerBegin, vAnswerEnd, word_index,
-                                                     config.max_context_size, config.max_ques_size)
-        print('Vectoring process completed.')
+        self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion,
+                                                     self.tAnswerBegin, self.tAnswerEnd, word_index,
+                                                     self.max_context_size, self.max_ques_size)
+        self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, 
+                                                     self.vAnswerBegin, self.vAnswerEnd, word_index,
+                                                     self.max_context_size, self.max_ques_size)
 
-        self.num_examples = len(tX)
-        self.all_data = {'tX': tX, 'tXq': tXq, 'tYBegin': tYBegin, 'tYEnd': tYEnd,
-                         'vX': vX, 'vXq': vXq, 'vYBegin': vYBegin, 'vYEnd': vYEnd}
+        print('Vectorizing process completed.')
 
-    def get_all_data(self):
+        self.convertToNumpy()
+
+    def getAllData(self):
         return self.all_data
 
-    def get_num_batches(self):
-        return int(math.ceil(self.num_examples / self.batch_size))
+    def convertToNumpy(self):
+        self.tX = np.array(self.tX)
+        self.tXq = np.array(self.tXq)
+        self.tYBegin = np.array(self.tYBegin)
+        self.tYEnd = np.array(self.tYEnd)
+        self.vX = np.array(self.vX)
+        self.vXq = np.array(self.vXq)
+        self.vYBegin = np.array(self.vYBegin)
+        self.vYEnd = np.array(self.vYEnd)
+        self.vContext = np.array(self.vContext, dtype=object)
+        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
 
-    def get_batch(self):
-        assert len(self.all_data['tX']) == len(self.all_data['tXq'])
-        assert len(self.all_data['tX']) == len(self.all_data['tYBegin'])
-        assert len(self.all_data['tX']) == len(self.all_data['tYEnd'])
-        points = np.random.choice(len(self.all_data['tX']), self.batch_size)
-        tX_batch = np.array(self.all_data['tX'])[points]
-        tXq_batch = np.array(self.all_data['tX'])[points]
-        tYBegin_batch = np.array(self.all_data['tX'])[points]
-        tYEnd_batch = np.array(self.all_data['tX'])[points]
+    def getNumTrainBatches(self):
+        return int(math.ceil(len(self.tX) / self.batch_size))
 
-        return {'tX_batch': tX_batch, 'tXq_batch': tXq_batch,
-                'tYBegin_batch': tYBegin_batch, 'tYEnd_batch': tYEnd_batch}
+    def getNumValBatches(self):
+        return int(math.ceil(len(self.vX) / self.batch_size))
+
+    def getTrainQueueRunner(self):
+        queue = tf.FIFOQueue(capacity=(5 * self.batch_size), 
+                            dtypes=[tf.int32, tf.int32, tf.int32, tf.int32], 
+                            shapes=[[self.tX[0].shape[0]], [self.tXq[0].shape[0]], [], []])
 
 
+        enqueue_op = queue.enqueue_many([self.tX,
+                                        self.tXq,
+                                        self.tYBegin,
+                                        self.tYEnd])
+        qr = tf.train.QueueRunner(queue, [enqueue_op] * self.num_threads)
+        return queue, qr
 
+    def getValBatch(self):
+        points = np.random.choice(len(self.vX), self.batch_size)
+
+        vContext_batch = self.vContext[points]
+        vQuestionID_batch = self.vQuestionID[points]
+        vX_batch = self.vX[points]
+        vXq_batch = self.vXq[points]
+        vYBegin_batch = self.vYBegin[points]
+        vYEnd_batch = self.vYEnd[points]
+
+        return {'vContext': vContext_batch, 'vQuestionID': vQuestionID_batch,
+                'vX': vX_batch, 'vXq': vXq_batch,
+                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def loadGloveModel(self, gloveFile):
         print("Loading Glove Model...")
@@ -104,55 +134,6 @@ class Data:
            fix weird quotation marks.
         '''
         return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
-
-    def splitSquadDatasets(self, f):
-        '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
-           and keep track of max context and question lengths.
-        '''
-        xContext = [] # list of contexts paragraphs
-        xQuestion = [] # list of questions
-        xQuestion_id = [] # list of question id
-        xAnswerBegin = [] # list of indices of the beginning word in each answer span
-        xAnswerEnd = [] # list of indices of the ending word in each answer span
-        xAnswerText = [] # list of the answer text
-        maxLenContext = 0
-        maxLenQuestion = 0
-
-        for data in f['data']:
-            paragraphs = data['paragraphs']
-            for paragraph in paragraphs:
-                context = paragraph['context']
-                context1 = context.replace("''", '" ')
-                context1 = context1.replace("``", '" ')
-                contextTokenized = self.tokenize(context.lower())
-                contextLength = len(contextTokenized)
-                if contextLength > maxLenContext:
-                    maxLenContext = contextLength
-                qas = paragraph['qas']
-                for qa in qas:
-                    question = qa['question']
-                    question = question.replace("''", '" ')
-                    question = question.replace("``", '" ')
-                    questionTokenized = self.tokenize(question.lower())
-                    if len(questionTokenized) > maxLenQuestion:
-                        maxLenQuestion = len(questionTokenized)
-                    question_id = qa['id']
-                    answers = qa['answers']
-                    for answer in answers:
-                        answerText = answer['text']
-                        answerTokenized = self.tokenize(answerText.lower())
-                        # find indices of beginning/ending words of answer span among tokenized context
-                        contextToAnswerFirstWord = context1[:answer['answer_start'] + len(answerTokenized[0])]
-                        answerBeginIndex = len(self.tokenize(contextToAnswerFirstWord.lower())) - 1
-                        answerEndIndex = answerBeginIndex + len(answerTokenized)
-
-                        xContext.append(contextTokenized)
-                        xQuestion.append(questionTokenized)
-                        xQuestion_id.append(str(question_id))
-                        xAnswerBegin.append(answerBeginIndex)
-                        xAnswerEnd.append(answerEndIndex)
-                        xAnswerText.append(answerText)
-        return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
 
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
@@ -244,8 +225,8 @@ class Data:
         cf = open(candidatesPath, 'w', encoding='utf-8')
 
         for i in range(len(vContext)):
-            predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i]])
-            trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i]])
+            predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
+            trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
 
             reference = {}
             candidate = {}
@@ -255,16 +236,11 @@ class Data:
             candidate['query_id'] = vQuestionID[i]
             candidate['answers'] = [predictedAnswer]
 
-            print(json.dumps(reference), file=rf)
-            print(json.dumps(candidate), file=cf)
+            print(json.dumps(reference, ensure_ascii=False), file=rf)
+            print(json.dumps(candidate, ensure_ascii=False), file=cf)
 
         rf.close()
         cf.close()
-
-    def importSquad(self, json_file):
-        with open(json_file, encoding='utf-8') as f:
-            data = json.load(f)
-        return data
 
     def importMsmarco(self, json_file):
         data = {}

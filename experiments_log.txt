@@ -1,0 +1,49 @@
+keep_prob: 0.7
+hidden_size: 100
+emb_size: 50
+train_path: ./datasets/msmarco/train/person.json
+val_path: ./datasets/msmarco/dev/person.json
+epochs: 20
+batch_size: 64
+learning_rate: 0.5
+model_file: baseline.py
+date: 4/18/2017 5:30pm
+val_begin_acc: 0.4393063583815029
+val_end_acc: 0.4161849710982659
+
+eval_output:
+{'reflen': 1317, 'correct': [736, 593, 484, 428], 'testlen': 1798, 'guess': [1798, 1639, 1485, 1396]}
+ratio: 1.3652239939245518
+############################
+bleu_1: 0.40934371523892693
+bleu_2: 0.3848415306903258
+bleu_3: 0.3641057954053657
+bleu_4: 0.3487869934449224
+rouge_l: 0.488928639296
+############################ 
+
+*********************************************************************************************************
+
+keep_prob: 0.7
+hidden_size: 100
+emb_size: 50
+train_path: ./datasets/msmarco/train/location.json
+val_path: ./datasets/msmarco/dev/location.json
+epochs: 20
+batch_size: 64
+learning_rate: 0.5
+model_file: baseline.py
+date: 4/19/2017 12:45pm
+val_begin_acc: 0.3323943661971831
+val_end_acc: 0.4225352112676056
+
+eval_output:
+{'guess': [4381, 4059, 3754, 3477], 'testlen': 4381, 'correct': [2059, 1724, 1493, 1310], 'reflen': 3961}
+ratio: 1.10603382984067
+############################
+bleu_1: 0.46998402191269795
+bleu_2: 0.4467871272457427
+bleu_3: 0.42978931506295565
+bleu_4: 0.41587073696537397
+rouge_l: 0.471668839126
+############################
