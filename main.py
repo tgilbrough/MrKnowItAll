@@ -1,6 +1,7 @@
 import argparse
 import tensorflow as tf
 from tqdm import tqdm
+import os
 
 from baseline import Model
 from data import Data
@@ -26,11 +27,15 @@ def main():
     parser = get_parser()
     config = parser.parse_args()
 
+    tf.reset_default_graph()
+
     data = Data(config)
     model = Model(config, data.max_context_size, data.max_ques_size)
 
     tensorboard_path = './tensorboard_models/' + model.model_name
     save_model_path = config.model_save_dir + '/' + model.model_name 
+    if not os.path.exists(save_model_path):
+        os.makedirs(save_model_path)
 
     print('Building tensorflow computation graph...')
 
@@ -104,7 +109,7 @@ def main():
                                                                     y_end: valBatch['vYEnd'],
                                                                     keep_prob: 1.0})
                     if val_loss < min_val_loss:
-                        saver.save(sess, save_model_path)
+                        saver.save(sess, save_model_path + '/model')
                         min_val_loss = val_loss
 
                     train_writer.add_summary(train_sum, e * number_of_train_batches + i)
@@ -112,6 +117,15 @@ def main():
 
         coord.request_stop()
         coord.join(enqueue_threads)
+
+        # Load best graph on validation data
+        
+        new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
+        new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
+        all_vars = tf.get_collection('vars')
+        for v in all_vars:
+            v_ = sess.run(v)
+            print(v_)
 
         # Print out answers for one of the batches
         vContext = []
