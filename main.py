@@ -109,7 +109,7 @@ def main():
                             keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
                 
-                if (e * number_of_train_batches + i) % 20 == 0:
+                if (e * number_of_train_batches + i) % 8 == 0:
                     # Record results for tensorboard
                     feed_dict={x: trainBatch['tX'],
                             x_len: [data.max_context_size] * len(trainBatch['tX']),
