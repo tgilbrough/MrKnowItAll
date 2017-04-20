@@ -109,41 +109,37 @@ def main():
                             keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
                 
-                if (e * number_of_train_batches + i) % 8 == 0:
-                    # Record results for tensorboard
-                    feed_dict={x: trainBatch['tX'],
-                            x_len: [data.max_context_size] * len(trainBatch['tX']),
-                            q: trainBatch['tXq'],
-                            q_len: [data.max_ques_size] * len(trainBatch['tX']),
-                            y_begin: trainBatch['tYBegin'],
-                            y_end: trainBatch['tYEnd'],
-                            keep_prob: 1.0}
-                    train_sum = sess.run(merged_summary, feed_dict=feed_dict)
+                
+            # Record results for tensorboard, once per epoch
+            feed_dict={x: trainBatch['tX'],
+                    x_len: [data.max_context_size] * len(trainBatch['tX']),
+                    q: trainBatch['tXq'],
+                    q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                    y_begin: trainBatch['tYBegin'],
+                    y_end: trainBatch['tYEnd'],
+                    keep_prob: 1.0}
+            train_sum = sess.run(merged_summary, feed_dict=feed_dict)
 
-                    valBatch = data.getRandomValBatch()
-                    feed_dict={x: valBatch['vX'],
-                            x_len: [data.max_context_size] * len(valBatch['vX']),
-                            q: valBatch['vXq'],
-                            q_len: [data.max_ques_size] * len(valBatch['vX']),
-                            y_begin: valBatch['vYBegin'],
-                            y_end: valBatch['vYEnd'],
-                            keep_prob: 1.0}
-                    val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict=feed_dict)
-                    if val_loss < min_val_loss:
-                        saver.save(sess, save_model_path + '/model')
-                        min_val_loss = val_loss
+            valBatch = data.getRandomValBatch()
+            feed_dict={x: valBatch['vX'],
+                    x_len: [data.max_context_size] * len(valBatch['vX']),
+                    q: valBatch['vXq'],
+                    q_len: [data.max_ques_size] * len(valBatch['vX']),
+                    y_begin: valBatch['vYBegin'],
+                    y_end: valBatch['vYEnd'],
+                    keep_prob: 1.0}
+            val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict=feed_dict)
+            if val_loss < min_val_loss:
+                saver.save(sess, save_model_path + '/model')
+                min_val_loss = val_loss
 
-                    train_writer.add_summary(train_sum, e * number_of_train_batches + i)
-                    val_writer.add_summary(val_sum, e * number_of_train_batches + i)
+            train_writer.add_summary(train_sum, e * number_of_train_batches + i)
+            val_writer.add_summary(val_sum, e * number_of_train_batches + i)
                     
         # Load best graph on validation data
 
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
         new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
-        all_vars = tf.get_collection('vars')
-        for v in all_vars:
-            v_ = sess.run(v)
-            print(v_)
 
         # Print out answers for one of the batches
         vContext = []
