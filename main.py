@@ -17,7 +17,7 @@ def get_parser():
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', '-e', type=int, default=100)
     parser.add_argument('--batch_size', '-bs', type=int, default=64)
-    parser.add_argument('--learning_rate', '-lr', type=float, default=0.5)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
 
@@ -61,7 +61,7 @@ def main():
         acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
         acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
 
-    train_step = tf.train.GradientDescentOptimizer(config.learning_rate).minimize(loss)
+    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
     
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
