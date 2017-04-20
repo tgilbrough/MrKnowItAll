@@ -9,6 +9,7 @@ class Model:
         self.dim = config.hidden_size
         self.max_x = max_x
         self.max_q = max_q
+        self.saver = None
 
     def build(self, x, x_len, q, q_len, embeddings, keep_prob):
         with tf.variable_scope('embedding_matrix'):
