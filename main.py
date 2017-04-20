@@ -21,7 +21,7 @@ def get_parser():
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
-    parser.add_argument('--tensorboard_name', default='baseline')
+    parser.add_argument('--tensorboard_name', '-tn', default='baseline')
 
     return parser
 
