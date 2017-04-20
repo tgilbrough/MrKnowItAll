@@ -133,8 +133,8 @@ def main():
                 saver.save(sess, save_model_path + '/model')
                 min_val_loss = val_loss
 
-            train_writer.add_summary(train_sum, e * number_of_train_batches + i)
-            val_writer.add_summary(val_sum, e * number_of_train_batches + i)
+            train_writer.add_summary(train_sum, e)
+            val_writer.add_summary(val_sum, e)
                     
         # Load best graph on validation data
 
