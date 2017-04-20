@@ -33,7 +33,7 @@ def main():
     model = Model(config, data.max_context_size, data.max_ques_size)
 
     tensorboard_path = './tensorboard_models/' + model.model_name
-    save_model_path = config.model_save_dir + '/' + model.model_name 
+    save_model_path = config.model_save_dir + '/' + model.model_name
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
 
@@ -52,16 +52,7 @@ def main():
 
     print('Computation graph completed.')
 
-    with tf.variable_scope('loss'):
-        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
-        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
-        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
-        loss = loss1 + loss2
-    with tf.variable_scope('accuracy'):
-        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
-        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
-
-    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
+    train_step = model.train(outputs, y_begin, y_end)
     
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
@@ -69,7 +60,7 @@ def main():
     # For tensorboard
     train_writer = tf.summary.FileWriter(tensorboard_path + '/train')
     val_writer = tf.summary.FileWriter(tensorboard_path + '/dev')
-    
+
     tf.summary.scalar("loss", loss)
     tf.summary.scalar("loss1", loss1)
     tf.summary.scalar("loss2", loss2)
@@ -87,7 +78,7 @@ def main():
 
         coord = tf.train.Coordinator()
         enqueue_threads = train_qr.create_threads(sess, coord=coord, start=True)
-        
+
         sess.run(tf.global_variables_initializer())
 
         for e in range(config.epochs):
@@ -97,7 +88,7 @@ def main():
                     break
 
                 sess.run(train_step, feed_dict={keep_prob: config.keep_prob})
-                
+
                 if (e * number_of_train_batches + i) % 20 == 0:
                     # Record results for tensorboard
                     train_sum = sess.run(merged_summary, feed_dict={keep_prob: config.keep_prob})
@@ -119,7 +110,7 @@ def main():
         coord.join(enqueue_threads)
 
         # Load best graph on validation data
-        
+
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
         new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
         all_vars = tf.get_collection('vars')
@@ -134,7 +125,7 @@ def main():
         predictedEnd = []
         trueBegin = []
         trueEnd = []
-        
+
         begin_corr = 0
         end_corr = 0
         total = 0
@@ -148,7 +139,7 @@ def main():
             begin, end = sess.run([prediction_begin, prediction_end], feed_dict={x: batch['vX'],
                                                                                 q: batch['vXq'],
                                                                                 y_begin: batch['vYBegin'],
-                                                                                y_end: batch['vYEnd'], 
+                                                                                y_end: batch['vYEnd'],
                                                                                 keep_prob: 1.0})
 
             for j in range(len(begin)):
@@ -166,7 +157,7 @@ def main():
                 #print(batch['vQuestion'][j])
                 #print(batch['vContext'][j][begin[j] : end[j] + 1])
                 #print()
-                
+
         print('Validation Data:')
         print('begin accuracy: {}'.format(float(begin_corr) / total))
         print('end accuracy: {}'.format(float(end_corr) / total))
