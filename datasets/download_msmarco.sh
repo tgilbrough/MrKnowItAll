@@ -13,5 +13,5 @@ wget https://msmarco.blob.core.windows.net/msmarco/dev_v1.1.json.gz
 gunzip dev_v1.1.json.gz
 
 echo "Splitting queries by type..."
-python split_data.py
+python3 split_data.py
 cd ..
