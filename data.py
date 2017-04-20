@@ -216,9 +216,9 @@ class Data:
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
-        return pad_sequences(X, context_maxlen), pad_sequences(Xq, question_maxlen), YBegin, YEnd
+        return self.pad_sequences(X, context_maxlen), self.pad_sequences(Xq, question_maxlen), YBegin, YEnd
 
-    def pad_sequences(X, maxlen):
+    def pad_sequences(self, X, maxlen):
         for context in X:
             for i in range(len(context) - maxlen):
                 context.append(0)
