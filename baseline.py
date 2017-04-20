@@ -18,7 +18,7 @@ class Model:
 
         with tf.variable_scope('embedding_context'):
             context = tf.nn.embedding_lookup(emb_mat, x, name='context')
-        
+
         with tf.variable_scope('embedding_question'):
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
@@ -77,17 +77,14 @@ class Model:
         outputs = {'logits_start': logits_start, 'logits_end': logits_end, 'yp_start': yp_start, 'yp_end': yp_end}
         return outputs
 
-    def loss(self, outputs):
-        # Place holder for just index of answer within context  
-        y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
-        y_end = tf.placeholder(tf.int32, [None], name='y_end')
+    def train_step(self, outputs, y_begin, y_end):
+        with tf.variable_scope('loss'):
+            logits1, logits2 = outputs['logits_start'], outputs['logits_end']
+            loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
+            loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
+            loss = loss1 + loss2
+        with tf.variable_scope('accuracy'):
+            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
+            acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
 
-        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
-        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1))
-        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2))
-        loss = loss1 + loss2
-        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'))
-        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'))
-
-        loss_metrics = {'loss': loss, 'acc1': acc1, 'acc2': acc2}
-        return loss_metrics
+        return tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
