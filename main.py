@@ -60,7 +60,8 @@ def main():
     number_of_val_batches = data.getNumValBatches()
 
     # For tensorboard
-    writer = tf.summary.FileWriter('./tensorboard_models/' + model.model_name)
+    train_writer = tf.summary.FileWriter('./tensorboard_models/' + model.model_name + '/train')
+    val_writer = tf.summary.FileWriter('./tensorboard_models/' + model.model_name + '/dev')
     
     tf.summary.scalar("loss", loss)
     tf.summary.scalar("loss1", loss1)
@@ -70,36 +71,43 @@ def main():
     merged_summary = tf.summary.merge_all()
 
     with tf.Session() as sess:
-        writer.add_graph(sess.graph)
+        train_writer.add_graph(sess.graph)
+        val_writer.add_graph(sess.graph)
+        
         sess.run(tf.global_variables_initializer())
-        training_steps_count = 0
+
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
             for i in tqdm(range(number_of_train_batches)):
-                batch = data.getTrainBatch()
+                trainBatch = data.getTrainBatch()
 
-                sess.run(train_step, feed_dict={x: batch['tX'],
-                                        x_len: [data.max_context_size] * len(batch['tX']),
-                                        q: batch['tXq'],
-                                        q_len: [data.max_ques_size] * len(batch['tX']),
-                                        y_begin: batch['tYBegin'],
-                                        y_end: batch['tYEnd'], 
+                sess.run(train_step, feed_dict={x: trainBatch['tX'],
+                                        x_len: [data.max_context_size] * len(trainBatch['tX']),
+                                        q: trainBatch['tXq'],
+                                        q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                                        y_begin: trainBatch['tYBegin'],
+                                        y_end: trainBatch['tYEnd'], 
                                         keep_prob: config.keep_prob})
-                if training_steps_count % 20 == 0:
-                    acc_begin, acc_end, s = sess.run([acc1, acc2, merged_summary], feed_dict={x: batch['tX'],
-                                                                                x_len: [data.max_context_size] * len(batch['tX']),
-                                                                                q: batch['tXq'],
-                                                                                q_len: [data.max_ques_size] * len(batch['tX']),
-                                                                                y_begin: batch['tYBegin'],
-                                                                                y_end: batch['tYEnd'],
-                                                                                keep_prob: 1.0})
-                    writer.add_summary(s, training_steps_count)
+                if (e * number_of_train_batches + i) % 20 == 0:
+                    # Record results for tensorboard
+                    train_sum = sess.run(merged_summary, feed_dict={x: trainBatch['tX'],
+                                                                      x_len: [data.max_context_size] * len(trainBatch['tX']),
+                                                                      q: trainBatch['tXq'],
+                                                                      q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                                                                      y_begin: trainBatch['tYBegin'],
+                                                                      y_end: trainBatch['tYEnd'],
+                                                                      keep_prob: 1.0})
 
-                training_steps_count += 1
-
-            print('beginning accuracy: {}'.format(acc_begin))
-            print('end accuracy {}'.format(acc_end))
-            print()
+                    valBatch = data.getValBatch()
+                    val_sum = sess.run(merged_summary, feed_dict={x: valBatch['vX'],
+                                                                    x_len: [data.max_context_size] * len(valBatch['vX']),
+                                                                    q: valBatch['vXq'],
+                                                                    q_len: [data.max_ques_size] * len(valBatch['vX']),
+                                                                    y_begin: valBatch['vYBegin'],
+                                                                    y_end: valBatch['vYEnd'],
+                                                                    keep_prob: 1.0})
+                    train_writer.add_summary(train_sum, e * number_of_train_batches + i)
+                    val_writer.add_summary(val_sum, e * number_of_train_batches + i)
 
 
         # Print out answers for one of the batches

@@ -8,8 +8,6 @@ from keras.preprocessing.sequence import pad_sequences
 class Data:
     def __init__(self, config):
         self.batch_size = config.batch_size
-        self.train_batch_count = 0
-        self.val_batch_count = 0
 
         print('Preparing embedding matrix.')
 
@@ -48,10 +46,25 @@ class Data:
                                                      self.max_context_size, self.max_ques_size)
         self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
+
         print('Vectorizing process completed.')
+
+        self.convertToNumpy()
 
     def getAllData(self):
         return self.all_data
+
+    def convertToNumpy(self):
+        self.tX = np.array(self.tX)
+        self.tXq = np.array(self.tXq)
+        self.tYBegin = np.array(self.tYBegin)
+        self.tYEnd = np.array(self.tYEnd)
+        self.vX = np.array(self.vX)
+        self.vXq = np.array(self.vXq)
+        self.vYBegin = np.array(self.vYBegin)
+        self.vYEnd = np.array(self.vYEnd)
+        self.vContext = np.array(self.vContext, dtype=object)
+        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
 
     def getNumTrainBatches(self):
         return int(math.ceil(len(self.tX) / self.batch_size))
@@ -66,22 +79,12 @@ class Data:
 
         points = np.random.choice(len(self.tX), self.batch_size)
 
-        start_index = self.batch_size * self.train_batch_count
-        end_index = min(self.batch_size * (self.train_batch_count + 1), len(self.tX))
-        tContext_batch = self.tContext[start_index : end_index]
-        tQuestion_batch = self.tQuestion[start_index : end_index]
-        tQuestionID_batch = self.tQuestionID[start_index : end_index]
-        tX_batch = self.tX[start_index : end_index]
-        tXq_batch = self.tXq[start_index : end_index]
-        tYBegin_batch = self.tYBegin[start_index : end_index]
-        tYEnd_batch = self.tYEnd[start_index : end_index]
+        tX_batch = self.tX[points]
+        tXq_batch = self.tXq[points]
+        tYBegin_batch = self.tYBegin[points]
+        tYEnd_batch = self.tYEnd[points]
 
-        self.train_batch_count += 1
-        if self.train_batch_count == self.getNumTrainBatches():
-            self.train_batch_count = 0
-
-        return {'tContext': tContext_batch, 'tQuestion': tQuestion_batch,
-                'tQuestionID': tQuestionID_batch, 'tX': tX_batch, 'tXq': tXq_batch,
+        return {'tX': tX_batch, 'tXq': tXq_batch,
                 'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
 
     def getValBatch(self):
@@ -91,22 +94,15 @@ class Data:
 
         points = np.random.choice(len(self.vX), self.batch_size)
 
-        start_index = self.batch_size * self.val_batch_count
-        end_index = min(self.batch_size * (self.val_batch_count + 1), len(self.vX))
-        vContext_batch = self.vContext[start_index : end_index]
-        vQuestion_batch = self.vQuestion[start_index : end_index]
-        vQuestionID_batch = self.vQuestionID[start_index : end_index]
-        vX_batch = self.vX[start_index : end_index]
-        vXq_batch = self.vXq[start_index : end_index]
-        vYBegin_batch = self.vYBegin[start_index : end_index]
-        vYEnd_batch = self.vYEnd[start_index : end_index]
+        vContext_batch = self.vContext[points]
+        vQuestionID_batch = self.vQuestionID[points]
+        vX_batch = self.vX[points]
+        vXq_batch = self.vXq[points]
+        vYBegin_batch = self.vYBegin[points]
+        vYEnd_batch = self.vYEnd[points]
 
-        self.val_batch_count += 1
-        if self.val_batch_count == self.getNumValBatches():
-            self.val_batch_count = 0
-
-        return {'vContext': vContext_batch, 'vQuestion': vQuestion_batch,
-                'vQuestionID': vQuestionID_batch, 'vX': vX_batch, 'vXq': vXq_batch,
+        return {'vContext': vContext_batch, 'vQuestionID': vQuestionID_batch,
+                'vX': vX_batch, 'vXq': vXq_batch,
                 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def loadGloveModel(self, gloveFile):
