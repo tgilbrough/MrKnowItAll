@@ -5,23 +5,27 @@ nltk.download('punkt')
 
 from keras.preprocessing.sequence import pad_sequences
 
+import tensorflow as tf
+
 class Data:
     def __init__(self, config):
         self.batch_size = config.batch_size
+        self.keep_prob = config.keep_prob
+        self.num_threads = config.num_threads
 
         print('Preparing embedding matrix.')
 
         # load training data, parse, and split
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
-        self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, self.maxLenTContext, self.maxLenTQuestion = self.splitMsmarcoDatasets(
-            trainData)
+        self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
+            self.maxLenTContext, self.maxLenTQuestion = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
-        self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(
-            valData)
+        self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
+            self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
         print('Building vocabulary...')
         # build a vocabular over all training and validation context paragraphs and question words
@@ -42,9 +46,11 @@ class Data:
 
         # tX: training Context, tXq: training Question, tYBegin: training Answer Begin ptr,
         # tYEnd: training Answer End ptr
-        self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion, self.tAnswerBegin, self.tAnswerEnd, word_index,
+        self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion,
+                                                     self.tAnswerBegin, self.tAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
-        self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, self.vAnswerBegin, self.vAnswerEnd, word_index,
+        self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, 
+                                                     self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
         print('Vectorizing process completed.')
@@ -72,26 +78,20 @@ class Data:
     def getNumValBatches(self):
         return int(math.ceil(len(self.vX) / self.batch_size))
 
-    def getTrainBatch(self):
-        assert len(self.tX) == len(self.tXq)
-        assert len(self.tX) == len(self.tYBegin)
-        assert len(self.tX) == len(self.tYEnd)
+    def getTrainQueueRunner(self):
+        queue = tf.FIFOQueue(capacity=(5 * self.batch_size), 
+                            dtypes=[tf.int32, tf.int32, tf.int32, tf.int32], 
+                            shapes=[[self.tX[0].shape[0]], [self.tXq[0].shape[0]], [], []])
 
-        points = np.random.choice(len(self.tX), self.batch_size)
 
-        tX_batch = self.tX[points]
-        tXq_batch = self.tXq[points]
-        tYBegin_batch = self.tYBegin[points]
-        tYEnd_batch = self.tYEnd[points]
-
-        return {'tX': tX_batch, 'tXq': tXq_batch,
-                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
+        enqueue_op = queue.enqueue_many([self.tX,
+                                        self.tXq,
+                                        self.tYBegin,
+                                        self.tYEnd])
+        qr = tf.train.QueueRunner(queue, [enqueue_op] * self.num_threads)
+        return queue, qr
 
     def getValBatch(self):
-        assert len(self.vX) == len(self.vXq)
-        assert len(self.vX) == len(self.vYBegin)
-        assert len(self.vX) == len(self.vYEnd)
-
         points = np.random.choice(len(self.vX), self.batch_size)
 
         vContext_batch = self.vContext[points]
