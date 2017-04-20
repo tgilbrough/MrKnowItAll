@@ -21,6 +21,7 @@ def get_parser():
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
+    parser.add_argument('--tensorboard_name', default='baseline')
 
     return parser
 
@@ -35,7 +36,7 @@ def main():
     data = Data(config)
     model = Model(config, data.max_context_size, data.max_ques_size)
 
-    tensorboard_path = './tensorboard_models/' + model.model_name
+    tensorboard_path = './tensorboard_models/' + config.tensorboard_name
     save_model_path = config.model_save_dir + '/' + model.model_name
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
