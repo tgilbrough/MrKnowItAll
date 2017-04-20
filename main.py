@@ -20,12 +20,15 @@ def get_parser():
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
+    parser.add_argument('--load_model', '-l', type=int, default=0)
 
     return parser
 
 def main():
     parser = get_parser()
     config = parser.parse_args()
+
+    load_model = config.load_model
 
     tf.reset_default_graph()
 
@@ -53,7 +56,7 @@ def main():
     print('Computation graph completed.')
 
     train_step = model.train(outputs, y_begin, y_end)
-    
+
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
 
@@ -81,30 +84,31 @@ def main():
 
         sess.run(tf.global_variables_initializer())
 
-        for e in range(config.epochs):
-            print('Epoch {}/{}'.format(e + 1, config.epochs))
-            for i in tqdm(range(number_of_train_batches)):
-                if coord.should_stop():
-                    break
+        if load_model == 0:
+            for e in range(config.epochs):
+                print('Epoch {}/{}'.format(e + 1, config.epochs))
+                for i in tqdm(range(number_of_train_batches)):
+                    if coord.should_stop():
+                        break
 
-                sess.run(train_step, feed_dict={keep_prob: config.keep_prob})
+                    sess.run(train_step, feed_dict={keep_prob: config.keep_prob})
 
-                if (e * number_of_train_batches + i) % 20 == 0:
-                    # Record results for tensorboard
-                    train_sum = sess.run(merged_summary, feed_dict={keep_prob: config.keep_prob})
+                    if (e * number_of_train_batches + i) % 20 == 0:
+                        # Record results for tensorboard
+                        train_sum = sess.run(merged_summary, feed_dict={keep_prob: config.keep_prob})
 
-                    valBatch = data.getValBatch()
-                    val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict={x: valBatch['vX'],
-                                                                    q: valBatch['vXq'],
-                                                                    y_begin: valBatch['vYBegin'],
-                                                                    y_end: valBatch['vYEnd'],
-                                                                    keep_prob: 1.0})
-                    if val_loss < min_val_loss:
-                        saver.save(sess, save_model_path + '/model')
-                        min_val_loss = val_loss
+                        valBatch = data.getValBatch()
+                        val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict={x: valBatch['vX'],
+                                                                        q: valBatch['vXq'],
+                                                                        y_begin: valBatch['vYBegin'],
+                                                                        y_end: valBatch['vYEnd'],
+                                                                        keep_prob: 1.0})
+                        if val_loss < min_val_loss:
+                            saver.save(sess, save_model_path + '/model')
+                            min_val_loss = val_loss
 
-                    train_writer.add_summary(train_sum, e * number_of_train_batches + i)
-                    val_writer.add_summary(val_sum, e * number_of_train_batches + i)
+                        train_writer.add_summary(train_sum, e * number_of_train_batches + i)
+                        val_writer.add_summary(val_sum, e * number_of_train_batches + i)
 
         coord.request_stop()
         coord.join(enqueue_threads)
