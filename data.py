@@ -3,8 +3,6 @@ import numpy as np
 import nltk
 nltk.download('punkt')
 
-from keras.preprocessing.sequence import pad_sequences
-
 import tensorflow as tf
 
 class Data:
@@ -49,7 +47,7 @@ class Data:
         self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion,
                                                      self.tAnswerBegin, self.tAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
-        self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion, 
+        self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion,
                                                      self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
@@ -79,8 +77,8 @@ class Data:
         return int(math.ceil(len(self.vX) / self.batch_size))
 
     def getTrainQueueRunner(self):
-        queue = tf.FIFOQueue(capacity=(5 * self.batch_size), 
-                            dtypes=[tf.int32, tf.int32, tf.int32, tf.int32], 
+        queue = tf.FIFOQueue(capacity=(5 * self.batch_size),
+                            dtypes=[tf.int32, tf.int32, tf.int32, tf.int32],
                             shapes=[[self.tX[0].shape[0]], [self.tXq[0].shape[0]], [], []])
 
 
@@ -218,7 +216,12 @@ class Data:
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
-        return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), YBegin, YEnd
+        return pad_sequences(X, context_maxlen), pad_sequences(Xq, question_maxlen), YBegin, YEnd
+
+    def pad_sequences(X, maxlen):
+        for context in X:
+            for i in range(len(context) - maxlen):
+                context.append(0)
 
     def saveAnswersForEval(self, referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         rf = open(referencesPath, 'w', encoding='utf-8')
