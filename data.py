@@ -12,6 +12,7 @@ class Data:
         self.batch_size = config.batch_size
         self.keep_prob = config.keep_prob
         self.num_threads = config.num_threads
+        self.valBatchNum = 0
 
         print('Preparing embedding matrix.')
 
@@ -91,8 +92,32 @@ class Data:
         qr = tf.train.QueueRunner(queue, [enqueue_op] * self.num_threads)
         return queue, qr
 
-    def getValBatch(self):
+    def getRandomTrainBatch(self):
+        points = np.random.choice(len(self.tX), self.batch_size)
+
+        tX_batch = self.tX[points]
+        tXq_batch = self.tXq[points]
+        tYBegin_batch = self.tYBegin[points]
+        tYEnd_batch = self.tYEnd[points]
+
+        return {'tX': tX_batch, 'tXq': tXq_batch,
+                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
+
+    def getRandomValBatch(self):
         points = np.random.choice(len(self.vX), self.batch_size)
+
+        vX_batch = self.vX[points]
+        vXq_batch = self.vXq[points]
+        vYBegin_batch = self.vYBegin[points]
+        vYEnd_batch = self.vYEnd[points]
+
+        return {'vX': vX_batch, 'vXq': vXq_batch,
+                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
+
+    def getValBatch(self):
+        start = self.valBatchNum * self.batch_size
+        end = min(len(self.vX), (self.valBatchNum + 1) * self.batch_size)
+        points = np.arange(start, end)
 
         vContext_batch = self.vContext[points]
         vQuestionID_batch = self.vQuestionID[points]
@@ -100,6 +125,11 @@ class Data:
         vXq_batch = self.vXq[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
+
+        self.valBatchNum += 1
+
+        if self.valBatchNum >= self.getNumValBatches():
+            self.valBatchNum = 0
 
         return {'vContext': vContext_batch, 'vQuestionID': vQuestionID_batch,
                 'vX': vX_batch, 'vXq': vXq_batch,
@@ -148,6 +178,8 @@ class Data:
         maxLenContext = 0
         maxLenQuestion = 0
 
+        seen_query_ids = set()
+
         # For now only pick out selected passages that have answers directly inside the passage
         for data in f['data']:
             for passage in data['passages']:
@@ -176,7 +208,7 @@ class Data:
                     answerTokenized = self.tokenize(answer.lower())
                     answerBeginIndex, answerEndIndex = self.findAnswer(contextTokenized, answerTokenized)
                     if answerBeginIndex != None:
-                        xContext.append(contextTokenized)
+                        xContext.append(c   ontextTokenized)
                         xQuestion.append(questionTokenized)
                         xQuestion_id.append(question_id)
                         xAnswerBegin.append(answerBeginIndex)
