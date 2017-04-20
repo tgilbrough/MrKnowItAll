@@ -3,3 +3,6 @@ datasets/glove
 venv
 .idea/
 __pycache__/
+tensorboard_models/
+saved_models/
+eval/*.json
