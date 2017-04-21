@@ -3,8 +3,6 @@ import numpy as np
 import nltk
 nltk.download('punkt')
 
-from keras.preprocessing.sequence import pad_sequences
-
 import tensorflow as tf
 
 class Data:
@@ -250,13 +248,13 @@ class Data:
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
-        return pad_sequences(X, maxlen=context_maxlen, padding='post'), pad_sequences(Xq, maxlen=question_maxlen, padding='post'), YBegin, YEnd
-        # return self.pad_sequences(X, context_maxlen), self.pad_sequences(Xq, question_maxlen), YBegin, YEnd
+        return self.pad_sequences(X, context_maxlen), self.pad_sequences(Xq, question_maxlen), YBegin, YEnd
 
-    # def pad_sequences(self, X, maxlen):
-    #     for context in X:
-    #         for i in range(len(context) - maxlen):
-    #             context.append(0)
+    def pad_sequences(self, X, maxlen):
+        for context in X:
+            for i in range(maxlen - len(context)):
+                context.append(0)
+        return X
 
     def saveAnswersForEval(self, referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         rf = open(referencesPath, 'w', encoding='utf-8')
