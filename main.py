@@ -43,27 +43,29 @@ def main():
 
     print('Building tensorflow computation graph...')
 
-    # Data input queues
-    train_queue, train_qr = data.getTrainQueueRunner()
-    x, q, y_begin, y_end = train_queue.dequeue_many(config.batch_size)
-
+    # shape = batch_size by num_features
+    x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
+    x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
+    q = tf.placeholder(tf.int32, shape=[None, data.tXq[0].shape[0]], name='q')
+    q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
-
-    x_len = [data.max_context_size for i in range(config.batch_size)]
-    q_len = [data.max_ques_size for i in range(config.batch_size)]
 
     outputs = model.build(x, x_len, q, q_len, data.embeddings, keep_prob)
 
     print('Computation graph completed.')
 
-    train_step = model.train(outputs, y_begin, y_end)
-
-    number_of_train_batches = data.getNumTrainBatches()
-    number_of_val_batches = data.getNumValBatches()
-
-    # For tensorboard
-    train_writer = tf.summary.FileWriter(tensorboard_path + '/train')
-    val_writer = tf.summary.FileWriter(tensorboard_path + '/dev')
+    # Place holder for just index of answer within context  
+    y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
+    y_end = tf.placeholder(tf.int32, [None], name='y_end')
+    
+    with tf.variable_scope('loss'):
+        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
+        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
+        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
+        loss = loss1 + loss2
+    with tf.variable_scope('accuracy'):
+        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
+        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
 
     tf.summary.scalar("loss", loss)
     tf.summary.scalar("loss1", loss1)
@@ -72,6 +74,15 @@ def main():
     tf.summary.scalar("accuracy2", acc2)
     merged_summary = tf.summary.merge_all()
 
+    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
+
+    number_of_train_batches = data.getNumTrainBatches()
+    number_of_val_batches = data.getNumValBatches()
+
+    # For tensorboard
+    train_writer = tf.summary.FileWriter(tensorboard_path + '/train')
+    val_writer = tf.summary.FileWriter(tensorboard_path + '/dev')
+
     # For saving models
     saver = tf.train.Saver()
     min_val_loss = float('Inf')
@@ -79,49 +90,56 @@ def main():
     with tf.Session() as sess:
         train_writer.add_graph(sess.graph)
         val_writer.add_graph(sess.graph)
-
-        coord = tf.train.Coordinator()
-        enqueue_threads = train_qr.create_threads(sess, coord=coord, start=True)
-
+        
         sess.run(tf.global_variables_initializer())
 
-        if load_model == 0:
-            for e in range(config.epochs):
-                print('Epoch {}/{}'.format(e + 1, config.epochs))
-                for i in tqdm(range(number_of_train_batches)):
-                    if coord.should_stop():
-                        break
+        for e in range(config.epochs):
+            print('Epoch {}/{}'.format(e + 1, config.epochs))
+            for i in tqdm(range(number_of_train_batches)):
+                # if coord.should_stop():
+                #     break
+                trainBatch = data.getRandomTrainBatch()
 
-                    sess.run(train_step, feed_dict={keep_prob: config.keep_prob})
+                feed_dict={x: trainBatch['tX'],
+                            x_len: [data.max_context_size] * len(trainBatch['tX']),
+                            q: trainBatch['tXq'],
+                            q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                            y_begin: trainBatch['tYBegin'],
+                            y_end: trainBatch['tYEnd'],
+                            keep_prob: config.keep_prob}
+                sess.run(train_step, feed_dict=feed_dict)
+                
+                
+            # Record results for tensorboard, once per epoch
+            feed_dict={x: trainBatch['tX'],
+                    x_len: [data.max_context_size] * len(trainBatch['tX']),
+                    q: trainBatch['tXq'],
+                    q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                    y_begin: trainBatch['tYBegin'],
+                    y_end: trainBatch['tYEnd'],
+                    keep_prob: 1.0}
+            train_sum = sess.run(merged_summary, feed_dict=feed_dict)
 
-                    if (e * number_of_train_batches + i) % 20 == 0:
-                        # Record results for tensorboard
-                        train_sum = sess.run(merged_summary, feed_dict={keep_prob: config.keep_prob})
+            valBatch = data.getRandomValBatch()
+            feed_dict={x: valBatch['vX'],
+                    x_len: [data.max_context_size] * len(valBatch['vX']),
+                    q: valBatch['vXq'],
+                    q_len: [data.max_ques_size] * len(valBatch['vX']),
+                    y_begin: valBatch['vYBegin'],
+                    y_end: valBatch['vYEnd'],
+                    keep_prob: 1.0}
+            val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict=feed_dict)
+            if val_loss < min_val_loss:
+                saver.save(sess, save_model_path + '/model')
+                min_val_loss = val_loss
 
-                        valBatch = data.getValBatch()
-                        val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict={x: valBatch['vX'],
-                                                                        q: valBatch['vXq'],
-                                                                        y_begin: valBatch['vYBegin'],
-                                                                        y_end: valBatch['vYEnd'],
-                                                                        keep_prob: 1.0})
-                        if val_loss < min_val_loss:
-                            saver.save(sess, save_model_path + '/model')
-                            min_val_loss = val_loss
-
-                        train_writer.add_summary(train_sum, e * number_of_train_batches + i)
-                        val_writer.add_summary(val_sum, e * number_of_train_batches + i)
-
-        coord.request_stop()
-        coord.join(enqueue_threads)
-
+            train_writer.add_summary(train_sum, e)
+            val_writer.add_summary(val_sum, e)
+                    
         # Load best graph on validation data
 
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
         new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
-        all_vars = tf.get_collection('vars')
-        for v in all_vars:
-            v_ = sess.run(v)
-            print(v_)
 
         # Print out answers for one of the batches
         vContext = []
@@ -136,27 +154,32 @@ def main():
         total = 0
 
         for i in range(number_of_val_batches):
-            batch = data.getValBatch()
+            valBatch = data.getValBatch()
 
             prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
             prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
 
-            begin, end = sess.run([prediction_begin, prediction_end], feed_dict={x: batch['vX'],
-                                                                                q: batch['vXq'],
-                                                                                y_begin: batch['vYBegin'],
-                                                                                y_end: batch['vYEnd'],
-                                                                                keep_prob: 1.0})
+
+            feed_dict={x: valBatch['vX'],
+                            x_len: [data.max_context_size] * len(valBatch['vX']),
+                            q: valBatch['vXq'],
+                            q_len: [data.max_ques_size] * len(valBatch['vX']),
+                            y_begin: valBatch['vYBegin'],
+                            y_end: valBatch['vYEnd'],
+                            keep_prob: 1.0}
+            begin, end = sess.run([prediction_begin, prediction_end], feed_dict=feed_dict)
+
 
             for j in range(len(begin)):
-                vContext.append(batch['vContext'][j])
-                vQuestionID.append(batch['vQuestionID'][j])
+                vContext.append(valBatch['vContext'][j])
+                vQuestionID.append(valBatch['vQuestionID'][j])
                 predictedBegin.append(begin[j])
                 predictedEnd.append(end[j])
-                trueBegin.append(batch['vYBegin'][j])
-                trueEnd.append(batch['vYEnd'][j])
+                trueBegin.append(valBatch['vYBegin'][j])
+                trueEnd.append(valBatch['vYEnd'][j])
 
-                begin_corr += int(begin[j] == batch['vYBegin'][j])
-                end_corr += int(end[j] == batch['vYEnd'][j])
+                begin_corr += int(begin[j] == valBatch['vYBegin'][j])
+                end_corr += int(end[j] == valBatch['vYEnd'][j])
                 total += 1
 
                 #print(batch['vQuestion'][j])
