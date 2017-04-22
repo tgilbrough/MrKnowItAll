@@ -30,6 +30,7 @@ def get_permutations(all_options):
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('name')
     parser.add_argument('--question_type', '-q', nargs='+', default='all',
                         choices=QUESTION_TYPES + ['all'])
     parser.add_argument('--batch_size', '-bs', nargs='+', type=int, default=64)
@@ -48,9 +49,17 @@ def format_args(args):
         yield str(value)
 
 
+def get_experiment_name(options):
+    option_summary = '-'.join('{}:{}'.format(key, value)
+                              for key, value in sorted(options.items())
+                              if key != 'name')
+    return '{}-{}'.format(options['name'], option_summary)
+
+
 for options in get_permutations(get_args()):
     print(options)
-    options['tensorboard_name'] = 'asd'
+    options['tensorboard_name'] = get_experiment_name(options)
+    del(options['name'])
     args = ['python3', 'main.py'] + list(format_args(options))
     subprocess.run(args)
 
