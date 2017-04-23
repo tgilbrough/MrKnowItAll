@@ -34,3 +34,19 @@ CUDA requires some environment variables. These can be set using `source cuda_pa
 
 Run `source disable_tf_logging.sh`.
 
+## Running Experiments
+
+The `experiment.py` script is a utility for experimenting with different model
+parameters. It accepts multiple values for each parameter and tries all
+possible combinations of them.
+
+For example, the following command will try batch sizes of 16, 32, and 64,
+with question types of entity and location. It will always run for 10 epochs.
+
+```
+python experiment.py experiment_name -b 16 32 64 -q entity location -e 10
+```
+
+Results are dumped to the `tensorboard_models/` directory and can be viewed
+by using `python3 -m tensorflow.tensorboard --logdir tensorboard_models/`.
+The name of each experiment includes the parameters used.
