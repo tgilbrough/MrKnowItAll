@@ -258,8 +258,15 @@ class Data:
         return X
 
     def saveAnswersForEval(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
-        rf = open('./references/' + questionType + '.json', 'w', encoding='utf-8')
-        cf = open('./candidates/' + candidateName + '.json', 'w', encoding='utf-8')
+        ref_fn = './references/' + questionType + '.json'
+        can_fn = './candidates/' + candidateName + '.json'
+        
+        # Create files if they don't exist
+        touch(ref_fn)
+        touch(can_fn)
+
+        rf = open(ref_fn, 'w', encoding='utf-8')
+        cf = open(can_fn, 'w', encoding='utf-8')
 
         for i in range(len(vContext)):
             predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
@@ -278,6 +285,10 @@ class Data:
 
         rf.close()
         cf.close()
+
+    def touch(path):
+        with open(path, 'a'):
+            os.utime(path, None)
 
     def importMsmarco(self, json_file):
         data = {}
