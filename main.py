@@ -19,14 +19,14 @@ def get_parser():
     parser.add_argument('--val_path', default='./datasets/msmarco/dev/')
     parser.add_argument('--reference_path', default='./eval/references.json')
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
-    parser.add_argument('--epochs', '-e', type=int, default=100)
+    parser.add_argument('--epochs', '-e', type=int, default=50)
     parser.add_argument('--batch_size', '-bs', type=int, default=64)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline')
-    parser.add_argument('--tensorboard_name', '-tn', default='baseline')
+    parser.add_argument('--tensorboard_name', '-tn', default=None)
 
     return parser
 
@@ -48,9 +48,13 @@ def main():
     elif config.model == 'attention':
         model = attention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using attention model")
+    else:
+        raise ValueError('Specified invalid model')
 
+    if config.tensorboard_name is None:
+        config.tensorboard_name = model.model_name
     tensorboard_path = './tensorboard_models/' + config.tensorboard_name
-    save_model_path = config.model_save_dir + '/' + model.model_name
+    save_model_path = config.model_save_dir + '/' + config.tensorboard_name
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
 
@@ -109,8 +113,6 @@ def main():
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
             for i in tqdm(range(number_of_train_batches)):
-                # if coord.should_stop():
-                #     break
                 trainBatch = data.getRandomTrainBatch()
 
                 feed_dict={x: trainBatch['tX'],
@@ -150,7 +152,6 @@ def main():
             val_writer.add_summary(val_sum, e)
 
         # Load best graph on validation data
-
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
         new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
 
