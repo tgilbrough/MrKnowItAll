@@ -33,8 +33,13 @@ def get_args():
     parser.add_argument('name')
     parser.add_argument('--question_type', '-q', nargs='+', default='all',
                         choices=QUESTION_TYPES + ['all'])
-    parser.add_argument('--batch_size', '-bs', nargs='+', type=int, default=64)
-    parser.add_argument('--epochs', '-e', type=int, default=100)
+    parser.add_argument('--keep_prob', '-kp', type=float, default=0.7, nargs='+')
+    parser.add_argument('--hidden_size', '-hs', type=int, default=100, nargs='+')
+    parser.add_argument('--emb_size', '-es', type=int, default=50, nargs='+') # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
+    parser.add_argument('--epochs', '-e', type=int, default=100, nargs='+')
+    parser.add_argument('--batch_size', '-bs', type=int, default=64, nargs='+')
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, nargs='+')
+    parser.add_argument('--num_threads', '-t', type=int, default=4, nargs='+')
 
     args = vars(parser.parse_args())
     if 'all' in args['question_type']:
@@ -49,16 +54,20 @@ def format_args(args):
         yield str(value)
 
 
-def get_experiment_name(options):
+def get_experiment_name(options, non_default_args):
     option_summary = '-'.join('{}:{}'.format(key, value)
                               for key, value in sorted(options.items())
-                              if key != 'name')
+                              if key != 'name' and key in non_default_args)
     return '{}-{}'.format(options['name'], option_summary)
 
 
-for options in get_permutations(get_args()):
+args = get_args()
+non_default_args = [name for name, value in args.items()
+                    if isinstance(value, list)]
+
+for options in get_permutations(args):
     print(options)
-    options['tensorboard_name'] = get_experiment_name(options)
+    options['tensorboard_name'] = get_experiment_name(options, non_default_args)
     del(options['name'])
     args = ['python3', 'main.py'] + list(format_args(options))
     subprocess.run(args)
