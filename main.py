@@ -13,8 +13,10 @@ def get_parser():
     parser.add_argument('--keep_prob', '-kp', type=float, default=0.7)
     parser.add_argument('--hidden_size', '-hs', type=int, default=100)
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
-    parser.add_argument('--train_path', default='./datasets/msmarco/train/location.json')
-    parser.add_argument('--val_path', default='./datasets/msmarco/dev/location.json')
+    parser.add_argument('--question_type', '-q', default='location',
+                        choices=['description', 'entity', 'location', 'numeric', 'person'])
+    parser.add_argument('--train_path', default='./datasets/msmarco/train/')
+    parser.add_argument('--val_path', default='./datasets/msmarco/dev/')
     parser.add_argument('--reference_path', default='./eval/references.json')
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', '-e', type=int, default=100)
@@ -23,14 +25,16 @@ def get_parser():
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
-    parser.add_argument('--tensorboard_name', default='baseline')
     parser.add_argument('--model', '-m', default='baseline')
+    parser.add_argument('--tensorboard_name', '-tn', default='baseline')
 
     return parser
 
 def main():
     parser = get_parser()
     config = parser.parse_args()
+    config.train_path = '{}{}.json'.format(config.train_path, config.question_type)
+    config.val_path = '{}{}.json'.format(config.val_path, config.question_type)
 
     load_model = config.load_model
 
@@ -63,10 +67,10 @@ def main():
 
     print('Computation graph completed.')
 
-    # Place holder for just index of answer within context  
+    # Place holder for just index of answer within context
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
-    
+
     with tf.variable_scope('loss'):
         logits1, logits2 = outputs['logits_start'], outputs['logits_end']
         loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
@@ -99,7 +103,7 @@ def main():
     with tf.Session() as sess:
         train_writer.add_graph(sess.graph)
         val_writer.add_graph(sess.graph)
-        
+
         sess.run(tf.global_variables_initializer())
 
         for e in range(config.epochs):
@@ -117,8 +121,8 @@ def main():
                             y_end: trainBatch['tYEnd'],
                             keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
-                
-                
+
+
             # Record results for tensorboard, once per epoch
             feed_dict={x: trainBatch['tX'],
                     x_len: [data.max_context_size] * len(trainBatch['tX']),
@@ -144,7 +148,7 @@ def main():
 
             train_writer.add_summary(train_sum, e)
             val_writer.add_summary(val_sum, e)
-                    
+
         # Load best graph on validation data
 
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
