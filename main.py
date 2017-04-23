@@ -15,8 +15,6 @@ def get_parser():
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--question_type', '-q', default='location',
                         choices=['description', 'entity', 'location', 'numeric', 'person'])
-    parser.add_argument('--reference_path', default='./eval/references.json')
-    parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', '-e', type=int, default=50)
     parser.add_argument('--batch_size', '-bs', type=int, default=64)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
