@@ -48,5 +48,5 @@ python experiment.py experiment_name -b 16 32 64 -q entity location -e 10
 ```
 
 Results are dumped to the `tensorboard_models/` directory and can be viewed
-by using `python3 -m tensorflow.tensorboard --logdir tensorboard_models/`.
+by using `tensorboard --logdir tensorboard_models/`.
 The name of each experiment includes the parameters used.
