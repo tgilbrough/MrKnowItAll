@@ -1,5 +1,6 @@
 import json, math
 import numpy as np
+import os
 import nltk
 nltk.download('punkt')
 
@@ -256,9 +257,9 @@ class Data:
                 context.append(0)
         return X
 
-    def saveAnswersForEval(self, referencesPath, candidatesPath, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
-        rf = open(referencesPath, 'w', encoding='utf-8')
-        cf = open(candidatesPath, 'w', encoding='utf-8')
+    def saveAnswersForEval(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
+        rf = open('./references/' + questionType + '.json', 'w', encoding='utf-8')
+        cf = open('./candidates/' + candidateName + '.json', 'w', encoding='utf-8')
 
         for i in range(len(vContext)):
             predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
