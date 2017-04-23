@@ -16,7 +16,7 @@ def get_parser():
     parser.add_argument('--question_type', '-q', default='location',
                         choices=['description', 'entity', 'location', 'numeric', 'person'])
     parser.add_argument('--epochs', '-e', type=int, default=50)
-    parser.add_argument('--batch_size', '-bs', type=int, default=64)
+    parser.add_argument('--batch_size', '-b', type=int, default=64)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
