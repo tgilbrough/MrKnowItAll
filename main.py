@@ -18,8 +18,6 @@ def get_parser():
     parser.add_argument('--epochs', '-e', type=int, default=50)
     parser.add_argument('--batch_size', '-bs', type=int, default=64)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
-    parser.add_argument('--num_threads', '-t', type=int, default=4)
-    parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
                         choices=['baseline', 'attention'])
@@ -49,7 +47,7 @@ def main():
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
     tensorboard_path = './tensorboard_models/' + config.tensorboard_name
-    save_model_path = config.model_save_dir + '/' + config.tensorboard_name
+    save_model_path = './saved_models/' + config.tensorboard_name
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
 
