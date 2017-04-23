@@ -78,19 +78,6 @@ class Data:
     def getNumValBatches(self):
         return int(math.ceil(len(self.vX) / self.batch_size))
 
-    def getTrainQueueRunner(self):
-        queue = tf.FIFOQueue(capacity=(5 * self.batch_size),
-                            dtypes=[tf.int32, tf.int32, tf.int32, tf.int32],
-                            shapes=[[self.tX[0].shape[0]], [self.tXq[0].shape[0]], [], []])
-
-
-        enqueue_op = queue.enqueue_many([self.tX,
-                                        self.tXq,
-                                        self.tYBegin,
-                                        self.tYEnd])
-        qr = tf.train.QueueRunner(queue, [enqueue_op] * self.num_threads)
-        return queue, qr
-
     def getRandomTrainBatch(self):
         points = np.random.choice(len(self.tX), self.batch_size)
 
