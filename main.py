@@ -15,8 +15,6 @@ def get_parser():
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--question_type', '-q', default='location',
                         choices=['description', 'entity', 'location', 'numeric', 'person'])
-    parser.add_argument('--train_path', default='./datasets/msmarco/train/')
-    parser.add_argument('--val_path', default='./datasets/msmarco/dev/')
     parser.add_argument('--reference_path', default='./eval/references.json')
     parser.add_argument('--candidate_path', default='./eval/candidates.json')
     parser.add_argument('--epochs', '-e', type=int, default=50)
@@ -25,7 +23,8 @@ def get_parser():
     parser.add_argument('--num_threads', '-t', type=int, default=4)
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
-    parser.add_argument('--model', '-m', default='baseline')
+    parser.add_argument('--model', '-m', default='baseline', 
+                        choices=['baseline', 'attention'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
 
     return parser
@@ -33,8 +32,8 @@ def get_parser():
 def main():
     parser = get_parser()
     config = parser.parse_args()
-    config.train_path = '{}{}.json'.format(config.train_path, config.question_type)
-    config.val_path = '{}{}.json'.format(config.val_path, config.question_type)
+    config.train_path = '{}{}.json'.format('./datasets/msmarco/train/', config.question_type)
+    config.val_path = '{}{}.json'.format('./datasets/msmarco/dev/', config.question_type)
 
     load_model = config.load_model
 
@@ -48,8 +47,6 @@ def main():
     elif config.model == 'attention':
         model = attention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using attention model")
-    else:
-        raise ValueError('Specified invalid model')
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
@@ -204,7 +201,9 @@ def main():
         print('begin accuracy: {}'.format(float(begin_corr) / total))
         print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEval(config.reference_path, config.candidate_path, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
+
+        
+        data.saveAnswersForEval(config.question_type, config.tensorboard_name, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
 
 if __name__ == "__main__":
     main()

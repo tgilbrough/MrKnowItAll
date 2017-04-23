@@ -3,7 +3,7 @@ import subprocess
 
 
 QUESTION_TYPES = ['description', 'entity', 'location', 'numeric', 'person']
-
+MODELS = ['baseline', 'attention']
 
 def get_permutations(all_options):
     """ {'a': [1,2], 'b': [3, 4], 'c': 5} ->
@@ -39,11 +39,13 @@ def get_args():
     parser.add_argument('--batch_size', '-bs', type=int, default=64, nargs='+')
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, nargs='+')
     parser.add_argument('--num_threads', '-t', type=int, default=4, nargs='+')
-    parser.add_argument('--model', '-m', default='baseline')
+    parser.add_argument('--model', '-m', default='baseline', nargs='+', choices=MODELS + ['all'])
 
     args = vars(parser.parse_args())
     if 'all' in args['question_type']:
         args['question_type'] = QUESTION_TYPES
+    if 'all' in args['model']:
+        args['model'] = MODELS
 
     return args
 
