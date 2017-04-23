@@ -70,5 +70,5 @@ for options in get_permutations(args):
     options['tensorboard_name'] = get_experiment_name(options, non_default_args)
     del(options['name'])
     args = ['python3', 'main.py'] + list(format_args(options))
-    subprocess.run(args)
+    subprocess.call(args)
 
