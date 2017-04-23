@@ -50,8 +50,8 @@ then
 fi
 
 if [ ! $# -eq 2 ]
-then
-    echo "Invalid arguments supplied."
+then 
+    PYTHONPATH=./bleu python ms_marco_eval.py references.json candidates.json
 else
     PYTHONPATH=./bleu python ms_marco_eval.py $1 $2
 fi

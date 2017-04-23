@@ -3,7 +3,9 @@ import tensorflow as tf
 from tqdm import tqdm
 import os
 
-from baseline import Model
+import baseline_model
+import attention_model
+
 from data import Data
 
 def get_parser():
@@ -22,6 +24,7 @@ def get_parser():
     parser.add_argument('--model_save_dir', default='./saved_models')
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--tensorboard_name', default='baseline')
+    parser.add_argument('--model', '-m', default='baseline')
 
     return parser
 
@@ -34,7 +37,13 @@ def main():
     tf.reset_default_graph()
 
     data = Data(config)
-    model = Model(config, data.max_context_size, data.max_ques_size)
+
+    if config.model == 'baseline':
+        model = baseline_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using baseline model")
+    elif config.model == 'attention':
+        model = attention_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using attention model")
 
     tensorboard_path = './tensorboard_models/' + config.tensorboard_name
     save_model_path = config.model_save_dir + '/' + model.model_name
