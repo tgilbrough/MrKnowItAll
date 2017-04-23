@@ -261,10 +261,6 @@ class Data:
         ref_fn = './references/' + questionType + '.json'
         can_fn = './candidates/' + candidateName + '.json'
         
-        # Create files if they don't exist
-        touch(ref_fn)
-        touch(can_fn)
-
         rf = open(ref_fn, 'w', encoding='utf-8')
         cf = open(can_fn, 'w', encoding='utf-8')
 
@@ -285,10 +281,6 @@ class Data:
 
         rf.close()
         cf.close()
-
-    def touch(path):
-        with open(path, 'a'):
-            os.utime(path, None)
 
     def importMsmarco(self, json_file):
         data = {}
