@@ -57,7 +57,7 @@ def format_args(args):
 
 
 def get_experiment_name(options, non_default_args):
-    option_summary = '-'.join('{}:{}'.format(key, value)
+    option_summary = '-'.join('{}={}'.format(key, value)
                               for key, value in sorted(options.items())
                               if key != 'model' and key in non_default_args)
     return '{}-{}'.format(options['model'], option_summary)
@@ -70,6 +70,6 @@ non_default_args = [name for name, value in args.items()
 for options in get_permutations(args):
     print(options)
     options['tensorboard_name'] = get_experiment_name(options, non_default_args)
-    args = ['python3', 'main.py'] + list(format_args(options))
+    args = ['python', 'main.py'] + list(format_args(options))
     subprocess.call(args)
 
