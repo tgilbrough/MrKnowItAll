@@ -10,7 +10,6 @@ class Data:
     def __init__(self, config):
         self.batch_size = config.batch_size
         self.keep_prob = config.keep_prob
-        self.num_threads = config.num_threads
         self.valBatchNum = 0
 
         print('Preparing embedding matrix.')
