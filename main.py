@@ -5,6 +5,7 @@ import os
 
 import baseline_model
 import attention_model
+import coattention_model
 
 from data import Data
 
@@ -20,7 +21,7 @@ def get_parser():
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
-                        choices=['baseline', 'attention'])
+                        choices=['baseline', 'attention', 'coattention'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
 
     return parser
@@ -43,6 +44,9 @@ def main():
     elif config.model == 'attention':
         model = attention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using attention model")
+    elif config.model == 'coattention':
+        model = coattention_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using coattention model")
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
