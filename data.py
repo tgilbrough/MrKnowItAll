@@ -27,7 +27,7 @@ class Data:
             self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
         print('Building vocabulary...')
-        # build a vocabular over all training and validation context paragraphs and question words
+        # build a vocabulary over all training and validation context paragraphs and question words
         vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
