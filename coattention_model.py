@@ -52,27 +52,43 @@ class Model:
         with tf.variable_scope('affinity_mat'):
             L = tf.matmul(tf.transpose(D, perm=[0, 2, 1]), Q, name='L')
 
+        print('L:', L.get_shape())
+
         with tf.variable_scope('normalize_aff'):
             Aq = tf.nn.softmax(L, name='Aq')
-            Ad = tf.nn.softmax(tf.transpose(L), name='Ad')
+            Ad = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Ad')
+
+        print('Aq:', Aq.get_shape())
+        print('Ad:', Ad.get_shape())
 
         with tf.variable_scope('attention_contexts'):
             Cq = tf.matmul(D, Aq, name='Cq')
 
+        print('Cq:', Cq.get_shape())
+
         with tf.variable_scope('attention_questions'):
             Cd = tf.concat([Q, Cq], axis=1)
             Cd = tf.matmul(Cd, Ad, name='Cd')
-
-        co_att = tf.concat([D, Cd], axis=2)
         
-        with tf.variable_scope('encoder'):
+        print('Cd:', Cd.get_shape())
+
+        co_att = tf.concat([D, Cd], axis=1)
+        co_att = tf.transpose(co_att, perm=[0, 2, 1])
+
+        print('co_att:', co_att.get_shape())
+        
+        with tf.variable_scope('encoding_understanding'):
             lstm_fw_cell = LSTMCell(self.hidden_size)
             lstm_bw_cell = LSTMCell(self.hidden_size)
 
             u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32)
-            
-            u_fw, u_bw = u
-            u = tf.concat([u_fw, u_bw], axis=2)
+    
+            U = tf.concat(u, axis=2)
+            U = tf.transpose(U, perm=[0, 2, 1])
+        
+        print('U:', U.get_shape())
+
+
 
         with tf.variable_scope('decoder'):
             lstm_dec = LSTMCell(self.hidden_size)
