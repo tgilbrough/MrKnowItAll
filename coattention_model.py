@@ -8,6 +8,8 @@ class Model:
         self.model_name = 'coattention'
         self.emb_size = config.emb_size
         self.hidden_size = config.hidden_size
+        # self.maxout_size = config.maxout_size
+        # self.max_decode_steps = config.max_decode_steps
         self.max_x = max_x
         self.max_q = max_q
         self.saver = None
@@ -89,16 +91,37 @@ class Model:
         print('U:', U.get_shape())
 
 
-
-        with tf.variable_scope('decoder'):
-            lstm_dec = LSTMCell(self.hidden_size)
-            question_fw, question_bw = outputs_question
-            question_output = tf.concat([question_fw, question_bw], axis=2)
+        # with tf.variable_scope('selector'):
+        #     highway_alpha = highway_maxout(self.hidden_size, self.maxout_size)
+        #     highway_beta = highway_maxout(self.hidden_size, self.maxout_size)
         
+        #     loop_until = tf.to_int32(np.array(range(batch_size)))
+        #     # initial estimated positions
+        #     s, e = tf.split(0, 2, self._guesses)
 
+        #     fn = lambda idx: select(U, s, idx)
+        #     u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
+        #     fn = lambda idx: select(U, e, idx)
+        #     u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
         
+        # with tf.variable_scope('decoder'):
+
+        with tf.variable_scope('post_process'):
+            gru_xq_cell = GRUCell(self.hidden_size)
+            gru_xq_cell = DropoutWrapper(gru_xq_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
+
+            outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(gru_xq_cell, gru_xq_cell, inputs=tf.transpose(U, perm=[0, 2, 1]), sequence_length=x_len, dtype=tf.float32)
+            xq_fw, xq_bw = outputs_xq
+            xq_output = tf.concat([xq_fw, xq_bw], axis=2)
+            tf.summary.histogram("xq_output", xq_output)
+
+        # Get rid of the sequence dimension
+        xq_flat = tf.reshape(xq_output, [-1, 2 * self.hidden_size])
+
+        # tensor of boolean values of max_x length and True in first x_len indices
+        x_mask = tf.sequence_mask(x_len, self.max_x)
 
         # logits
         with tf.variable_scope('start_index'):
