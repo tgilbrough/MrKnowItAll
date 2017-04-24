@@ -27,6 +27,8 @@ class Model:
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
         lstm_enc = LSTMCell(self.hidden_size)
+        lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
+        
 
         with tf.variable_scope('encoding_context'):
             D, _ = tf.nn.dynamic_rnn(lstm_enc, context, sequence_length=x_len, dtype=tf.float32)
@@ -82,6 +84,9 @@ class Model:
         with tf.variable_scope('encoding_understanding'):
             lstm_fw_cell = LSTMCell(self.hidden_size)
             lstm_bw_cell = LSTMCell(self.hidden_size)
+            lstm_fw_cell = DropoutWrapper(lstm_fw_cell, input_keep_prob=keep_prob)
+            lstm_bw_cell = DropoutWrapper(lstm_bw_cell, input_keep_prob=keep_prob)
+
 
             u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32)
     
