@@ -23,26 +23,18 @@ class Model:
         with tf.variable_scope('embedding_question'):
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
-        with tf.variable_scope('encoding_context'):
-            gru_c_fw_cell = GRUCell(self.dim)
-            gru_c_fw_cell = DropoutWrapper(gru_c_fw_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
+        with tf.variable_scope('encoding'):
+            cell = GRUCell(self.dim)
+            cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            gru_c_bw_cell = GRUCell(self.dim)
-            gru_c_bw_cell = DropoutWrapper(gru_c_bw_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
-
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_fw_cell, gru_c_bw_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)
             tf.summary.histogram("context_output", context_output)
 
-        with tf.variable_scope('encoding_question'):
-            gru_q_fw_cell = GRUCell(self.dim)
-            gru_q_fw_cell = DropoutWrapper(gru_q_fw_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
+            tf.get_variable_scope().reuse_variables()
 
-            gru_q_bw_cell = GRUCell(self.dim)
-            gru_q_bw_cell = DropoutWrapper(gru_q_bw_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
-
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(gru_q_fw_cell, gru_q_bw_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
+            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)
             tf.summary.histogram("question_output", question_output)
