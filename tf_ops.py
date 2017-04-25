@@ -2,9 +2,7 @@ import tensorflow as tf
 
 def maxout(inputs,
            num_units,
-           axis=None,
-           outputs_collections=None,
-           scope=None):
+           axis=None):
         """Adds a maxout op which is a max pooling performed in filter/channel
         dimension. This can also be used after fully-connected layers to reduce
         number of features.
@@ -22,17 +20,17 @@ def maxout(inputs,
             ValueError: if num_units is not multiple of number of features.
         """
         shape = inputs.get_shape().as_list()
-        if axis is None:
-            # Assume that channel is the last dimension
+        if shape[0] is None:
+            shape[0] = -1
+        if axis is None:  # Assume that channel is the last dimension
             axis = -1
         num_channels = shape[axis]
         if num_channels % num_units:
-            raise ValueError('number of features({}) is not a multiple of num_units({})'
-                                .format(num_channels, num_units))
-        shape[axis] = -1
+            raise ValueError('number of features({}) is not '
+                            'a multiple of num_units({})'.format(num_channels, num_units))
+        shape[axis] = num_units
         shape += [num_channels // num_units]
-        outputs = tf.reduce_max(tf.reshape(inputs, shape), -1,
-                                    keep_dims=False)
+        outputs = tf.reduce_max(tf.reshape(inputs, shape), -1, keep_dims=False)
         return outputs
 
 def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None):
@@ -65,6 +63,7 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
     if name is not None:
         w_name += name
     weights = tf.get_variable(w_name, [output_size, m], dtype=dtype)
+    print(w_name, ':', weights.get_shape())
     res = tf.map_fn(lambda x: tf.matmul(weights, x), args)
     if not bias:
         return res
@@ -98,23 +97,33 @@ def highway_maxout(hidden_size, pool_size):
         u_s = _to_3d(u_s)
         u_e = _to_3d(u_e)
 
+        print('u_t:', u_t.get_shape())
+
         # non-linear projection of decoder state and coattention
         state_s = tf.concat([h, u_s, u_e], axis=1)
+        print('state_s:', state_s.get_shape())
+        
         r = tf.tanh(batch_linear(state_s, hidden_size, False, name='r'))
         print('r:', r.get_shape())
+        
         u_r = tf.concat([u_t, r], axis=1)
         print('u_r:', u_r.get_shape())
+        
         # first maxout
         m_t1 = batch_linear(u_r, pool_size*hidden_size, True, name='m_1')
         m_t1 = maxout(m_t1, hidden_size, axis=1)
         print('m_t1:', m_t1.get_shape())
+        
         # second maxout
         m_t2 = batch_linear(m_t1, pool_size*hidden_size, True, name='m_2')
         m_t2 = maxout(m_t2, hidden_size, axis=1)
+        
         # highway connection
         mm = tf.concat([m_t1, m_t2], axis=1)
+        
         # final maxout
         res = maxout(batch_linear(mm, pool_size, True, name='mm'), 1, axis=1)
+        
         return res
 
     return compute
