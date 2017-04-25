@@ -83,6 +83,8 @@ def _to_3d(tensor):
     if tensor.get_shape().ndims != 2:
         raise ValueError("`tensor` must be a 2D Tensor")
     m, n = tensor.get_shape()
+    if m.value is None:
+        return tf.reshape(tensor, [-1, n.value, 1])
     return tf.reshape(tensor, [m.value, n.value, 1])
 
 def highway_maxout(hidden_size, pool_size):
@@ -95,18 +97,22 @@ def highway_maxout(hidden_size, pool_size):
         h = _to_3d(h)
         u_s = _to_3d(u_s)
         u_e = _to_3d(u_e)
+
         # non-linear projection of decoder state and coattention
-        state_s = tf.concat(1, [h, u_s, u_e])
+        state_s = tf.concat([h, u_s, u_e], axis=1)
         r = tf.tanh(batch_linear(state_s, hidden_size, False, name='r'))
-        u_r = tf.concat(1, [u_t, r])
+        print('r:', r.get_shape())
+        u_r = tf.concat([u_t, r], axis=1)
+        print('u_r:', u_r.get_shape())
         # first maxout
         m_t1 = batch_linear(u_r, pool_size*hidden_size, True, name='m_1')
         m_t1 = maxout(m_t1, hidden_size, axis=1)
+        print('m_t1:', m_t1.get_shape())
         # second maxout
         m_t2 = batch_linear(m_t1, pool_size*hidden_size, True, name='m_2')
         m_t2 = maxout(m_t2, hidden_size, axis=1)
         # highway connection
-        mm = tf.concat(1, [m_t1, m_t2])
+        mm = tf.concat([m_t1, m_t2], axis=1)
         # final maxout
         res = maxout(batch_linear(mm, pool_size, True, name='mm'), 1, axis=1)
         return res

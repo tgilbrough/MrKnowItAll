@@ -91,7 +91,8 @@ class Model:
         def select(u, pos, idx):
             u_idx = tf.gather(u, idx) # U for batch idx
             pos_idx = tf.gather(pos, idx) # Start for batch idx
-            return tf.reshape(tf.gather(u_idx, pos_idx), [-1])
+            u = tf.reshape(tf.gather(tf.transpose(u_idx), pos_idx), [-1]) # Get column vector for u_s or u_e
+            return u
 
         with tf.variable_scope('selector'):        
             
@@ -101,20 +102,20 @@ class Model:
             loop_until = tf.range(0, batch_size, dtype=tf.int32)
 
             # initial estimated positions
-            initial_guesses = tf.zeros([2, batch_size], dtype=tf.int32)
-            s, e = tf.split(initial_guesses, 2, axis=0)
+            s = tf.zeros([batch_size], dtype=tf.int32)
+            e = tf.zeros([batch_size], dtype=tf.int32)
 
             print('s:', s.get_shape())
 
             # Get U vectors of starting indexes
             fn = lambda idx: select(U, s, idx)
             u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
-            u_s = tf.reshape(u_s, shape=[batch_size, 2 * self.hidden_size])
+
+            print('u_s:', u_s.get_shape())
 
             # Get U vectors of ending indexes
             fn = lambda idx: select(U, e, idx)
             u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
-            u_e = tf.reshape(u_e, shape=[batch_size, 2 * self.hidden_size])
 
         print('u_s:', u_s.get_shape())
         print('u_e:', u_e.get_shape())
@@ -123,13 +124,13 @@ class Model:
             highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
-        with tf.variable_scope('decoder'):
+        with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
             lstm_dec = LSTMCell(self.hidden_size)
 
             for step in range(self.max_decode_steps):
                 if step > 0:
-                    tf.reuse_variables()
+                    scope.reuse_variables()
                 # single step lstm
                 _input = tf.concat([u_s, u_e], axis=1)
                 print('_input:', _input.get_shape())
@@ -137,17 +138,18 @@ class Model:
                 _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32)
                
                 h_state = tf.concat(h, axis=1)
-
                 print('h_state:', h_state.get_shape())
+                
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
-                    alpha = tf.map_fn(lambda u_t: fn(u_t), U, dtype=tf.float32)
+                    alpha = tf.map_fn(lambda u_t: fn(u_t), U, dtype=tf.float32) # u_t is full U matrix for each batch
                     s = tf.reshape(tf.argmax(alpha, axis=0), [batch_size])
                     
                     # update start guess
                     fn = lambda idx: select(U, s, idx)
                     u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
+                    print('u_s:', u_s.get_shape())
 
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
@@ -158,16 +160,20 @@ class Model:
                     # update end guess
                     fn = lambda idx: select(U, e, idx)
                     u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
+                    print('u_e:', u_e.get_shape())
+
+        q_mask = tf.sequence_mask(q_len, self.max_q)
+        x_mask = tf.sequence_mask(x_len, self.max_x)
 
         # logits
         with tf.variable_scope('start_index'):
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])
+            val = tf.reshape(alpha, [batch_size, -1])
             logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_start = tf.argmax(logits_start, axis=1, name='starting_index')
             tf.summary.histogram("yp_start", yp_start)
 
         with tf.variable_scope('end_index'):
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])
+            val = tf.reshape(beta, [batch_size, -1])
             logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_end = tf.argmax(logits_end, axis=1, name='ending_index')
             tf.summary.histogram("yp_end", yp_end)
