@@ -23,6 +23,8 @@ def get_parser():
     parser.add_argument('--model', '-m', default='baseline', 
                         choices=['baseline', 'attention', 'coattention'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
+    parser.add_argument('--pool_size', '-ps', type=int, default=16)
+    parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
 
     return parser
 
