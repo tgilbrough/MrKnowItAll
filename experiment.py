@@ -3,7 +3,7 @@ import subprocess
 
 
 QUESTION_TYPES = ['description', 'entity', 'location', 'numeric', 'person']
-MODELS = ['baseline', 'attention']
+MODELS = ['baseline', 'attention', 'coattention']
 
 def get_permutations(all_options):
     """ {'a': [1,2], 'b': [3, 4], 'c': 5} ->
