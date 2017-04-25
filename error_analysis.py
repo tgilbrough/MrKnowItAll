@@ -6,8 +6,8 @@ nltk.download('punkt')
 import json
 
 DATA_PATH = 'datasets/msmarco/dev/location.json'
-CANDIDATE_PATH = 'eval/candidates.json'
-REFERENCE_PATH = 'eval/references.json'
+CANDIDATE_PATH = 'candidates/baseline-batch_size=1024-epochs=50-hidden_size=50-keep_prob=0.5-learning_rate=0.01-question_type=location.json'
+REFERENCE_PATH = 'references/location.json'
 
 
 def load_json_lines(path):
@@ -30,8 +30,8 @@ def insert(string, to_insert, index):
 
 
 def mark(string, start, end, css_class):
-    marked = insert(passage, '</mark>', start)
-    marked = insert(passage, '<mark class="{}">'.format(css_class), end)
+    marked = insert(string, '</mark>', end)
+    marked = insert(marked, '<mark class="{}">'.format(css_class), start)
     return marked
 
 
@@ -41,27 +41,44 @@ def print_html(query, passage, candidate, reference):
     reference_start = passage.index(reference)
     reference_end = reference_start + len(reference)
 
-#     if (candidate_start < reference_start and candidate_end < reference_start):
-#         passage = mark(passage, reference_start, reference_end, 'reference')
-#         passage = mark(passage, candidate_start, candidate_end, 'candidate')
-#     elif (reference_start < candidate_start and reference_end < candidate_start):
-#         passage = mark(passage, candidate_start, candidate_end, 'candidate')
-#         passage = mark(passage, reference_start, reference_end, 'reference')
+    print(candidate_start)
+    print(candidate_end)
+    print(reference_start)
+    print(reference_end)
+    print(len(passage))
 
-    def get_class(index):
-        in_candidate = index >= candidate_start and index <= candidate_end
-        in_reference = index >= reference_start and index <= reference_end
-        if (in_candidate and in_reference):
-            return 'match'
-        if (in_candidate):
-            return 'candidate'
-        if (in_reference):
-            return 'reference'
-        return ''
-
-    passage = ' '.join('<span class="{}">{}</span>'
-                       .format(get_class(i), passage[i])
-                       for i in range(len(passage)))
+    if (candidate_start == reference_start and candidate_end == reference_end):
+        passage = mark(passage, candidate_start, candidate_end, 'match')
+    elif (candidate_start == reference_start and candidate_end < reference_end):
+        passage = mark(passage, candidate_end, reference_end, 'reference')
+        passage = mark(passage, candidate_start, candidate_end, 'match')
+    elif (candidate_start == reference_start and candidate_end > reference_end):
+        passage = mark(passage, reference_end, candidate_end, 'candidate')
+        passage = mark(passage, candidate_start, reference_end, 'match')
+    elif (candidate_start < reference_start and candidate_end > reference_end):
+        passage = mark(passage, reference_end, candidate_end, 'candidate')
+        passage = mark(passage, reference_start, reference_end, 'match')
+        passage = mark(passage, candidate_start, reference_start, 'candidate')
+    elif (reference_start < candidate_start and reference_end > candidate_end):
+        passage = mark(passage, candidate_end, reference_end, 'reference')
+        passage = mark(passage, candidate_start, candidate_end, 'match')
+        passage = mark(passage, reference_start, candidate_start, 'reference')
+    elif (candidate_start <= reference_start):
+        if (candidate_end < reference_start):
+            passage = mark(passage, reference_start, reference_end, 'reference')
+            passage = mark(passage, candidate_start, candidate_end, 'candidate')
+        else:
+            passage = mark(passage, candidate_end, reference_end, 'reference')
+            passage = mark(passage, reference_start, candidate_end, 'match')
+            passage = mark(passage, candidate_start, reference_start, 'candidate')
+    elif (reference_start <= candidate_start):
+        if (reference_end < candidate_start):
+            passage = mark(passage, candidate_start, candidate_end, 'candidate')
+            passage = mark(passage, reference_start, reference_end, 'reference')
+        else:
+            passage = mark(passage, reference_end, candidate_end, 'candidate')
+            passage = mark(passage, candidate_start, reference_end, 'match')
+            passage = mark(passage, reference_start, candidate_start, 'reference')
 
     print('''
         <div>
@@ -79,24 +96,17 @@ print('''
 <html>
     <head>
         <style>
-      div {
-        font-size: 0;
+
+      mark.reference {
+        background-color: #629bf7;
       }
 
-      span {
-        font-size: 12px;
+      mark.match {
+        background-color: #62f77e;
       }
 
-      span.reference {
-        background-color: green;
-      }
-
-      span.match {
-        background-color: DarkGreen;
-      }
-
-      span.candidate {
-        background-color: red;
+      mark.candidate {
+        background-color: #f76262;
       }
 
         </style>
@@ -119,8 +129,8 @@ for reference in reference_generator:
                    reference['answers'][0] in get_text(passage))
 
     print_html(query, passage,
-               reference['answers'][0],
-               candidate['answers'][0])
+               candidate['answers'][0],
+               reference['answers'][0])
 
 
 print('''
