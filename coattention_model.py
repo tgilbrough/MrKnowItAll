@@ -84,19 +84,20 @@ class Model:
             u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32)
     
             U = tf.concat(u, axis=2)
-            U = tf.transpose(U, perm=[0, 2, 1])
         
         print('U:', U.get_shape())
 
         def select(u, pos, idx):
             u_idx = tf.gather(u, idx) # U for batch idx
             pos_idx = tf.gather(pos, idx) # Start for batch idx
-            u = tf.reshape(tf.gather(tf.transpose(u_idx), pos_idx), [-1]) # Get column vector for u_s or u_e
+            u = tf.reshape(tf.gather(u_idx, pos_idx), [-1]) # Get column vector for u_s or u_e
             return u
 
         with tf.variable_scope('selector'):        
             
             batch_size = tf.shape(U)[0]
+
+            U_trans = tf.transpose(U, perm=[1, 0, 2])
 
             # batch indices
             loop_until = tf.range(0, batch_size, dtype=tf.int32)
@@ -106,12 +107,11 @@ class Model:
             e = tf.zeros([batch_size], dtype=tf.int32)
 
             print('s:', s.get_shape())
+            print('e:', e.get_shape())
 
             # Get U vectors of starting indexes
             fn = lambda idx: select(U, s, idx)
             u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
-
-            print('u_s:', u_s.get_shape())
 
             # Get U vectors of ending indexes
             fn = lambda idx: select(U, e, idx)
@@ -137,13 +137,13 @@ class Model:
 
                 _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32)
                
-                h_state = tf.concat(h, axis=1)
+                h_state = h[0] # h_state = tf.concat(h, axis=1)
                 print('h_state:', h_state.get_shape())
                 
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
-                    alpha = tf.map_fn(lambda u_t: fn(u_t), U, dtype=tf.float32) # u_t is full U matrix for each batch
+                    alpha = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32) # u_t is full U matrix for each batch
                     s = tf.reshape(tf.argmax(alpha, axis=0), [batch_size])
                     
                     # update start guess
@@ -154,7 +154,7 @@ class Model:
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
-                    beta = tf.map_fn(lambda u_t: fn(u_t), U, dtype=tf.float32)
+                    beta = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32)
                     e = tf.reshape(tf.argmax(beta, axis=0), [batch_size])
                     
                     # update end guess
