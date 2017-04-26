@@ -1,0 +1,43 @@
+
+body {
+    font-family: "Helvetica Neue", sans-serif;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+td, th {
+    border: 1px solid black;
+}
+
+td.query {
+    text-align: center;
+}
+
+th {
+    font-size: 20px;
+}
+
+td, th {
+    padding: 12px;
+}
+
+td.query {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+td.padding {
+    height: 48px;
+    border: none;
+}
+
+mark.reference {
+    background-color: #629bf7;
+}
+
+mark.candidate {
+    background-color: #f76262;
+}
+
