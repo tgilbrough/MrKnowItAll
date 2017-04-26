@@ -33,11 +33,16 @@ td.padding {
     border: none;
 }
 
-mark.reference {
-    background-color: #629bf7;
+mark.reference, mark.candidate {
+    background-color: rgb(167, 209, 255);
 }
 
-mark.candidate {
-    background-color: #f76262;
+span.model-name, .parameter {
+    display: block;
+}
+
+.parameter {
+    font-size: medium;
+    font-weight: normal;
 }
 
