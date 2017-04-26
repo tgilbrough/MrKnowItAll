@@ -50,3 +50,13 @@ python experiment.py experiment_name -b 16 32 64 -q entity location -e 10
 Results are dumped to the `tensorboard_models/` directory and can be viewed
 by using `tensorboard --logdir tensorboard_models/`.
 The name of each experiment includes the parameters used.
+
+## Error Analysis
+
+The `error_analysis.py` script takes the development dataset used, references, and one or more candidates.
+It prints HTML which can be piped to a file.
+This file must be in the `error_analysis/` directory for the CSS to work.
+
+```
+python error_analysis.py datasets/msmarco/dev/location.json references/location.json candidates/attention-batch_size=128-epochs=50-hidden_size=100-keep_prob=0.3-learning_rate=0.01-question_type=location.json candidates/baseline-batch_size=1024-epochs=50-hidden_size=100-keep_prob=0.3-learning_rate=0.01-question_type=location.json > error_analysis/index.html
+```
