@@ -2,6 +2,7 @@ import argparse
 import tensorflow as tf
 from tqdm import tqdm
 import os
+from tensorflow.python.client import timeline
 
 import baseline_model
 import attention_model
@@ -90,6 +91,8 @@ def main():
     with tf.Session() as sess:
         train_writer.add_graph(sess.graph)
         val_writer.add_graph(sess.graph)
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
 
         sess.run(tf.global_variables_initializer())
 
@@ -105,8 +108,11 @@ def main():
                             y_begin: trainBatch['tYBegin'],
                             y_end: trainBatch['tYEnd'],
                             keep_prob: config.keep_prob}
-                sess.run(train_step, feed_dict=feed_dict)
-
+                sess.run(train_step, feed_dict=feed_dict, options=run_options, run_metadata=run_metadata)
+                tl = timeline.Timeline(run_metadata.step_stats)
+                ctf = tl.generate_chrome_trace_format()
+                with open('timeline.json', 'w') as f:
+                    f.write(ctf)
 
             # Record results for tensorboard, once per epoch
             feed_dict={x: trainBatch['tX'],
