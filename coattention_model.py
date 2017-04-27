@@ -90,6 +90,12 @@ class Model:
         
         print('U:', U.get_shape())
 
+        def batch_gather(a, b):
+            b_2 = tf.expand_dims(b, 1)
+            range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
+            ind = tf.concat([range_, b_2], axis=1)
+            return tf.gather_nd(a, ind) 
+
         with tf.variable_scope('selector'):        
             
             batch_size = tf.shape(U)[0]
@@ -179,8 +185,4 @@ class Model:
         tf.add_to_collection('per_step_losses', cross_entropy_mean)
         return tf.add_n(tf.get_collection('per_step_losses'), name='per_step_loss')
 
-    def batch_gather(a, b):
-        b_2 = tf.expand_dims(b, 1)
-        range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
-        ind = tf.concat([range_, b_2], axis=1)
-        return tf.gather_nd(a, ind) 
+    
