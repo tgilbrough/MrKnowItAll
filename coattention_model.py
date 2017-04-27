@@ -145,8 +145,9 @@ class Model:
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
-                    # for each t, send in (batch_size, hidden_size) matrix 
-                    alpha = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+                    # # for each t, send in (batch_size, hidden_size) matrix 
+                    alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+                    
                     s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
 
                     # update start guess
@@ -156,7 +157,7 @@ class Model:
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
-                    beta = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+                    beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
                     e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     
                     # update end guess
