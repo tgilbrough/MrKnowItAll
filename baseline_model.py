@@ -96,5 +96,8 @@ class Model:
         tf.summary.scalar('accuracy1', acc1)
         tf.summary.scalar('accuracy2', acc2)
 
+        self.logits1 = logits_start
+        self.logits2 = logits_end
+
         self.loss = loss
         self.merged_summary = tf.summary.merge_all()

@@ -2,6 +2,7 @@ import argparse
 import tensorflow as tf
 from tqdm import tqdm
 import os
+from tensorflow.python.client import timeline
 
 import baseline_model
 import attention_model
@@ -11,13 +12,13 @@ from data import Data
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--keep_prob', '-kp', type=float, default=0.7)
-    parser.add_argument('--hidden_size', '-hs', type=int, default=100)
+    parser.add_argument('--keep_prob', '-kp', type=float, default=0.5)
+    parser.add_argument('--hidden_size', '-hs', type=int, default=50)
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--question_type', '-q', default='location',
                         choices=['description', 'entity', 'location', 'numeric', 'person'])
     parser.add_argument('--epochs', '-e', type=int, default=50)
-    parser.add_argument('--batch_size', '-b', type=int, default=64)
+    parser.add_argument('--batch_size', '-b', type=int, default=256)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
@@ -106,10 +107,6 @@ def main():
                             y_end: trainBatch['tYEnd'],
                             keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
-                tl = timeline.Timeline(run_metadata.step_stats)
-                ctf = tl.generate_chrome_trace_format()
-                with open('timeline.json', 'w') as f:
-                    f.write(ctf)
 
             # Record results for tensorboard, once per epoch
             feed_dict={x: trainBatch['tX'],
@@ -156,8 +153,8 @@ def main():
         for i in range(number_of_val_batches):
             valBatch = data.getValBatch()
 
-            prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
-            prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
+            prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
+            prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
 
 
             feed_dict={x: valBatch['vX'],
