@@ -64,6 +64,7 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
         w_name += name
     weights = tf.get_variable(w_name, [output_size, m], dtype=dtype)
     print(w_name, ':', weights.get_shape())
+    
     res = tf.map_fn(lambda x: tf.matmul(weights, x), args)
     if not bias:
         return res
