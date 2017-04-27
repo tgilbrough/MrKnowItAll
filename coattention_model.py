@@ -90,12 +90,6 @@ class Model:
         
         print('U:', U.get_shape())
 
-        def select(u, pos, idx):
-            u_idx = tf.gather(u, idx) # U for batch idx
-            pos_idx = tf.gather(pos, idx) # Start for batch idx
-            u = tf.reshape(tf.gather(u_idx, pos_idx), [-1]) # Get column vector for u_s or u_e
-            return u
-
         with tf.variable_scope('selector'):        
             
             batch_size = tf.shape(U)[0]
@@ -113,12 +107,10 @@ class Model:
             print('e:', e.get_shape())
 
             # Get U vectors of starting indexes
-            fn = lambda idx: select(U, s, idx)
-            u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32) # (batch_size, 2*hidden_size)
+            u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
             # Get U vectors of ending indexes
-            fn = lambda idx: select(U, e, idx)
-            u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32) # (batch_size, 2*hidden_size)
+            u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
 
         print('u_s:', u_s.get_shape())
         print('u_e:', u_e.get_shape())
@@ -127,7 +119,6 @@ class Model:
             highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
-        self._s, self._e = [], []
         self._alpha, self._beta = [], []
         with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
@@ -150,26 +141,22 @@ class Model:
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
                     # for each t, send in (batch_size, hidden_size) matrix 
                     alpha = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    s = tf.reshape(tf.argmax(alpha, axis=0), [batch_size]) # (batch_size)
-                    
+                    s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
+
                     # update start guess
-                    fn = lambda idx: select(U, s, idx)
-                    u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32) # (batch_size, 200)
+                    u_s = batch_gather(U, s) # (batch_size, 200)
                     print('u_s:', u_s.get_shape())
 
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
                     beta = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    e = tf.reshape(tf.argmax(beta, axis=0), [batch_size]) # (batch_size)
+                    e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     
                     # update end guess
-                    fn = lambda idx: select(U, e, idx)
-                    u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32) # (batch_size, 200)
+                    u_e = batch_gather(U, e) # (batch_size, 200)
                     print('u_e:', u_e.get_shape())
 
-                self._s.append(s)
-                self._e.append(e)
                 self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
                 self._beta.append(tf.reshape(beta, [batch_size, -1]))
         
@@ -191,3 +178,9 @@ class Model:
         cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
         tf.add_to_collection('per_step_losses', cross_entropy_mean)
         return tf.add_n(tf.get_collection('per_step_losses'), name='per_step_loss')
+
+    def batch_gather(a, b):
+        b_2 = tf.expand_dims(b, 1)
+        range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
+        ind = tf.concat([range_, b_2], axis=1)
+        return tf.gather_nd(a, ind) 
