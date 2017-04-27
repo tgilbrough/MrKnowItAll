@@ -66,31 +66,15 @@ def main():
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
-    outputs = model.build(x, x_len, q, q_len, data.embeddings, keep_prob)
-
-    print('Computation graph completed.')
-
     # Place holder for just index of answer within context
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    with tf.variable_scope('loss'):
-        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
-        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
-        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
-        loss = loss1 + loss2
-    with tf.variable_scope('accuracy'):
-        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
-        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
+    model.build(x, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
 
-    tf.summary.scalar("loss", loss)
-    tf.summary.scalar("loss1", loss1)
-    tf.summary.scalar("loss2", loss2)
-    tf.summary.scalar("accuracy1", acc1)
-    tf.summary.scalar("accuracy2", acc2)
-    merged_summary = tf.summary.merge_all()
+    print('Computation graph completed.')
 
-    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
+    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(model.loss)
 
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
@@ -132,7 +116,7 @@ def main():
                     y_begin: trainBatch['tYBegin'],
                     y_end: trainBatch['tYEnd'],
                     keep_prob: 1.0}
-            train_sum = sess.run(merged_summary, feed_dict=feed_dict)
+            train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
 
             valBatch = data.getRandomValBatch()
             feed_dict={x: valBatch['vX'],
@@ -142,7 +126,7 @@ def main():
                     y_begin: valBatch['vYBegin'],
                     y_end: valBatch['vYEnd'],
                     keep_prob: 1.0}
-            val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict=feed_dict)
+            val_sum, val_loss  = sess.run([model.merged_summary, model.loss], feed_dict=feed_dict)
             if val_loss < min_val_loss:
                 saver.save(sess, save_model_path + '/model')
                 min_val_loss = val_loss
