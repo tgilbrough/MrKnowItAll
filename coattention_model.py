@@ -174,6 +174,7 @@ class Model:
                 self._beta.append(tf.reshape(beta, [batch_size, -1]))
         
         self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
+        tf.summary.scalar('loss', self.loss)
         self.merged_summary = tf.summary.merge_all()
     
 
