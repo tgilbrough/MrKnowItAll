@@ -43,40 +43,28 @@ class Model:
 
             Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
             tf.summary.histogram('Q', Q)   
-            
-        print('D:', D.get_shape())
-        print('Q:', Q.get_shape())
 
         with tf.variable_scope('affinity_mat'):
             L = tf.matmul(D, Q, name='L', transpose_a=True) # (batch_size, max_x, max_q)
             tf.summary.histogram('L', L)
-
-        print('L:', L.get_shape())
 
         with tf.variable_scope('normalize_aff'):
             Aq = tf.nn.softmax(L, name='Aq') # (batch_size, max_x, max_q)
             Ad = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Ad') # (batch_size, max_q, max_x)
             tf.summary.histogram('Aq', Aq)
             tf.summary.histogram('Ad', Ad)
-        
-        print('Aq:', Aq.get_shape())
-        print('Ad:', Ad.get_shape())
 
         with tf.variable_scope('attention_contexts'):
             Cq = tf.matmul(D, Aq, name='Cq') # (batch_size, hidden_size, max_q)
-
-        print('Cq:', Cq.get_shape())
+            tf.summary.histogram('Cq', Cq)
 
         with tf.variable_scope('attention_questions'):
             Cd = tf.concat([Q, Cq], axis=1) # (batch_size, 2*hidden_size, max_q)
             Cd = tf.matmul(Cd, Ad, name='Cd') # (batch_size, 2*hidden_size, max_x)
-        
-        print('Cd:', Cd.get_shape())
+            tf.summary.histogram('Cd', Cd)
 
         co_att = tf.concat([D, Cd], axis=1) # (batch_size, 3*hidden_size, max_x)
         co_att = tf.transpose(co_att, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
-
-        print('co_att:', co_att.get_shape())
         
         with tf.variable_scope('encoding_understanding'):
             lstm_fw_cell = LSTMCell(self.hidden_size)
@@ -87,8 +75,7 @@ class Model:
             u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
     
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
-        
-        print('U:', U.get_shape())
+            tf.summary.histogram('U', U)
 
         def batch_gather(a, b):
             b_2 = tf.expand_dims(b, 1)
@@ -97,7 +84,6 @@ class Model:
             return tf.gather_nd(a, ind) 
 
         with tf.variable_scope('selector'):        
-            
             batch_size = tf.shape(U)[0]
 
             U_trans = tf.transpose(U, perm=[1, 0, 2]) # (max_q, batch_size, 2*hidden_size) //the u_t vectors
@@ -109,17 +95,11 @@ class Model:
             s = tf.zeros([batch_size], dtype=tf.int32) # (batch_size)
             e = tf.zeros([batch_size], dtype=tf.int32) # (batch_size)
 
-            print('s:', s.get_shape())
-            print('e:', e.get_shape())
-
             # Get U vectors of starting indexes
             u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
             # Get U vectors of ending indexes
             u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
-
-        print('u_s:', u_s.get_shape())
-        print('u_e:', u_e.get_shape())
 
         with tf.variable_scope('highway_init'):
             highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
@@ -136,35 +116,36 @@ class Model:
                     scope.reuse_variables()
                 
                 _input = tf.concat([u_s, u_e], axis=1) # (batch_size, 4*hidden_size)
-                print('_input:', _input.get_shape())
 
                 # single step lstm
                 _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
-               
+
                 h_state = h[0] # h_state = tf.concat(h, axis=1)
-                print('h_state:', h_state.get_shape())
                 
+                tf.summary.histogram('h_state', h_state)
+
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
                     # # for each t, send in (batch_size, hidden_size) matrix 
                     alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    
+                    tf.summary.histogram('alpha', alpha)
+
                     s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
 
                     # update start guess
                     u_s = batch_gather(U, s) # (batch_size, 200)
-                    print('u_s:', u_s.get_shape())
 
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
                     beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+                    tf.summary.histogram('beta', beta)
+
                     e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     
                     # update end guess
                     u_e = batch_gather(U, e) # (batch_size, 200)
-                    print('u_e:', u_e.get_shape())
 
                 self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
                 self._beta.append(tf.reshape(beta, [batch_size, -1]))
@@ -176,7 +157,6 @@ class Model:
 
         self.logits1 = self._alpha[-1]
         self.logits2 = self._beta[-1]
-        
         
         self.merged_summary = tf.summary.merge_all()
     
