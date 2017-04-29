@@ -129,6 +129,7 @@ class Model:
         with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
             lstm_dec = LSTMCell(self.hidden_size)
+            lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
 
             for step in range(self.max_decode_steps):
                 if step > 0:
@@ -168,8 +169,15 @@ class Model:
                 self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
                 self._beta.append(tf.reshape(beta, [batch_size, -1]))
         
+
         self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
+
         tf.summary.scalar('loss', self.loss)
+
+        self.logits1 = self._alpha[-1]
+        self.logits2 = self._beta[-1]
+        
+        
         self.merged_summary = tf.summary.merge_all()
     
 
