@@ -133,10 +133,11 @@ class Model:
             for step in range(self.max_decode_steps):
                 if step > 0:
                     scope.reuse_variables()
-                # single step lstm
+                
                 _input = tf.concat([u_s, u_e], axis=1) # (batch_size, 4*hidden_size)
                 print('_input:', _input.get_shape())
 
+                # single step lstm
                 _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
                
                 h_state = h[0] # h_state = tf.concat(h, axis=1)
