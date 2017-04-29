@@ -62,22 +62,28 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
     w_name = "weights_"
     if name is not None:
         w_name += name
-    weights = tf.get_variable(w_name, [output_size, m], dtype=dtype)
+    weights = tf.get_variable(w_name, [n, n], dtype=dtype)
+    
     print(w_name, ':', weights.get_shape())
     
-    res = tf.map_fn(lambda x: tf.matmul(weights, x), args)
+    x = tf.reshape(args, [-1, n])
+    res = tf.matmul(x, weights)
+    res = tf.reshape(res, [-1, m, n])
+    
     if not bias:
         return res
+    
     with tf.variable_scope(outer_scope) as inner_scope:
         b_name = "biases_"
         if name is not None:
             b_name += name
         inner_scope.set_partitioner(None)
         biases = tf.get_variable(
-            b_name, [output_size, n],
+            b_name, [m, n],
             dtype=dtype,
             initializer=tf.constant_initializer(bias_start, dtype=dtype))
-  return tf.map_fn(lambda x: tf.add(x, biases), res)
+        
+  return tf.add(res, biases)
 
 def _to_3d(tensor):
     if tensor.get_shape().ndims != 2:
