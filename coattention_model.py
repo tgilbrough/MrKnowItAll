@@ -30,15 +30,24 @@ class Model:
             lstm_enc = LSTMCell(self.hidden_size)
             lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
         
+            # Add sentinel to end of encodings
+            sentinel = tf.get_variable('sentinel', [1, self.hidden_size], dtype=tf.float32)
+            fn = lambda x: tf.concat([x, sentinel], axis=0)
+
             D, _ = tf.nn.dynamic_rnn(lstm_enc, context, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
-            D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)
+            D = tf.map_fn(lambda x: fn(x), D, dtype=tf.float32)
+            D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)            
             tf.summary.histogram('D', D)
 
             scope.reuse_variables()
 
             q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
+            q = tf.map_fn(lambda x: fn(x), q, dtype=tf.float32)
             q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
             tf.summary.histogram("Q'", q)
+
+            
+            
 
         with tf.variable_scope('transforming_question'):
             Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
