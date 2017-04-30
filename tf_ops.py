@@ -1,8 +1,6 @@
 import tensorflow as tf
 
-def maxout(inputs,
-           num_units,
-           axis=None):
+def maxout(inputs, num_units, axis=None):
         """Adds a maxout op which is a max pooling performed in filter/channel
         dimension. This can also be used after fully-connected layers to reduce
         number of features.
@@ -60,27 +58,20 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
     scope = tf.get_variable_scope()
     with tf.variable_scope(scope) as outer_scope:
         w_name = "weights_"
-        if name is not None:
-            w_name += name
-        weights = tf.get_variable(w_name, [n, n], dtype=dtype)
+        if name is not None: w_name += name
+        weights = tf.get_variable(w_name, [output_size, m], dtype=dtype)
         
-        x = tf.reshape(args, [-1, n])
-        res = tf.matmul(x, weights)
-        res = tf.reshape(res, [-1, m, n])
-        
+        res = tf.map_fn(lambda x: tf.matmul(weights, x), args)
         if not bias:
             return res
-        
         with tf.variable_scope(outer_scope) as inner_scope:
             b_name = "biases_"
-            if name is not None:
-                b_name += name
+            if name is not None: b_name += name
             inner_scope.set_partitioner(None)
             biases = tf.get_variable(
-                b_name, [m, n],
+                b_name, [output_size, n],
                 dtype=dtype,
                 initializer=tf.constant_initializer(bias_start, dtype=dtype))
-            
     return tf.add(res, biases)
 
 def _to_3d(tensor):
