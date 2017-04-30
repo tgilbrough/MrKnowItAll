@@ -40,6 +40,7 @@ class Model:
             q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
             tf.summary.histogram("Q'", q)
 
+        with tf.variable_scope('transforming_question'):
             Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
             tf.summary.histogram('Q', Q)   
 
@@ -69,7 +70,7 @@ class Model:
             lstm_bw_cell = DropoutWrapper(lstm_bw_cell, input_keep_prob=keep_prob)
 
             inputs_ = tf.concat([D, Cd], axis=1) # (batch_size, 3*hidden_size, max_x)
-            inputs_ = tf.transpose(co_att, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
+            inputs_ = tf.transpose(inputs_, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
 
             u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=inputs_, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
     
@@ -175,5 +176,3 @@ class Model:
         cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
         tf.add_to_collection('per_step_losses', cross_entropy_mean)
         return tf.add_n(tf.get_collection('per_step_losses'), name='per_step_loss')
-
-    
