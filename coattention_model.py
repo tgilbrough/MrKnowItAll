@@ -44,10 +44,7 @@ class Model:
             q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
             q = tf.map_fn(lambda x: fn(x), q, dtype=tf.float32)
             q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
-            tf.summary.histogram("Q'", q)
-
-            
-            
+            tf.summary.histogram('Q_', q)
 
         with tf.variable_scope('transforming_question'):
             Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
@@ -101,8 +98,8 @@ class Model:
             loop_until = tf.range(0, batch_size, dtype=tf.int32)
 
             # initial estimated positions
-            s = tf.zeros([batch_size], dtype=tf.int32) # (batch_size)
-            e = tf.zeros([batch_size], dtype=tf.int32) # (batch_size)
+            s = tf.zeros([batch_size], dtype=tf.int32, name='s') # (batch_size)
+            e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
 
             # Get U vectors of starting indexes
             u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
@@ -114,11 +111,15 @@ class Model:
             highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
+        self._s, self._e = [], []
         self._alpha, self._beta = [], []
         with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
             lstm_dec = LSTMCell(self.hidden_size)
             lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
+
+            # y_begin = tf.Print(y_begin, [y_begin], message='y_begin: ')
+            # y_end = tf.Print(y_end, [y_end], message='y_end: ')
 
             for step in range(self.max_decode_steps):
                 if step > 0:
@@ -141,10 +142,12 @@ class Model:
                     alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
                     tf.summary.histogram('alpha_iter_' + str(step + 1), alpha)
 
+                    # alpha = tf.Print(alpha, [tf.argmax(alpha, axis=0)], message='Alpha: ')
+
                     s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
 
                     # update start guess
-                    u_s = batch_gather(U, s) # (batch_size, 200)
+                    u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
@@ -156,11 +159,12 @@ class Model:
                     e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     
                     # update end guess
-                    u_e = batch_gather(U, e) # (batch_size, 200)
+                    u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
 
+                self._s.append(s)
+                self._e.append(e)
                 self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
-                self._beta.append(tf.reshape(beta, [batch_size, -1]))
-        
+                self._beta.append(tf.reshape(beta, [batch_size, -1]))   
 
         self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
 

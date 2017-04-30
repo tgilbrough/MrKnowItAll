@@ -2,7 +2,6 @@ import argparse
 import tensorflow as tf
 from tqdm import tqdm
 import os
-from tensorflow.python.client import timeline
 
 import baseline_model
 import attention_model
