@@ -63,7 +63,6 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
         if name is not None:
             w_name += name
         weights = tf.get_variable(w_name, [n, n], dtype=dtype)
-        tf.summary.histogram(w_name, weights)
         
         x = tf.reshape(args, [-1, n])
         res = tf.matmul(x, weights)
@@ -81,7 +80,6 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
                 b_name, [m, n],
                 dtype=dtype,
                 initializer=tf.constant_initializer(bias_start, dtype=dtype))
-            tf.summary.histogram(b_name, biases)
             
     return tf.add(res, biases)
 
@@ -108,26 +106,22 @@ def highway_maxout(hidden_size, pool_size):
         state_s = tf.concat([h, u_s, u_e], axis=1)
         
         r = tf.tanh(batch_linear(state_s, hidden_size, False, name='r'))
-        tf.summary.histogram('r', r)
 
         u_r = tf.concat([u_t, r], axis=1)
         
         # first maxout
         m_t1 = batch_linear(u_r, pool_size*hidden_size, True, name='m_1')
         m_t1 = maxout(m_t1, hidden_size, axis=1)
-        tf.summary.histogram('m_t1', m_t1)
         
         # second maxout
         m_t2 = batch_linear(m_t1, pool_size*hidden_size, True, name='m_2')
         m_t2 = maxout(m_t2, hidden_size, axis=1)
-        tf.summary.histogram('m_t2', m_t2)
 
         # highway connection
         mm = tf.concat([m_t1, m_t2], axis=1)
         
         # final maxout
         res = maxout(batch_linear(mm, pool_size, True, name='mm'), 1, axis=1)
-        tf.summary.histogram('final_maxout', res)
         
         return res
 
