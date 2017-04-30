@@ -26,7 +26,7 @@ class Model:
             context = tf.nn.embedding_lookup(emb_mat, x, name='context') # (batch_size, max_x, emb_size)
             question = tf.nn.embedding_lookup(emb_mat, q, name='question') # (batch_size, max_q, emb_size)
 
-        with tf.variable_scope('encoding'):
+        with tf.variable_scope('encoding') as scope:
             lstm_enc = LSTMCell(self.hidden_size)
             lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
         
@@ -34,7 +34,7 @@ class Model:
             D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)
             tf.summary.histogram('D', D)
 
-            tf.get_variable_scope.reuse_variables()
+            scope.reuse_variables()
 
             q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
             q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
