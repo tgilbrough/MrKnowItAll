@@ -22,21 +22,20 @@ class Model:
             emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
             tf.summary.histogram('emb_mat', emb_mat)
         
-        with tf.variable_scope('embedding_context'):
+        with tf.variable_scope('embedding'):
             context = tf.nn.embedding_lookup(emb_mat, x, name='context') # (batch_size, max_x, emb_size)
-
-        with tf.variable_scope('embedding_question'):
             question = tf.nn.embedding_lookup(emb_mat, q, name='question') # (batch_size, max_q, emb_size)
 
-        lstm_enc = LSTMCell(self.hidden_size)
-        lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
+        with tf.variable_scope('encoding'):
+            lstm_enc = LSTMCell(self.hidden_size)
+            lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
         
-        with tf.variable_scope('encoding_context'):
             D, _ = tf.nn.dynamic_rnn(lstm_enc, context, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
             D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)
             tf.summary.histogram('D', D)
 
-        with tf.variable_scope('encoding_question'):
+            tf.get_variable_scope.reuse_variables()
+
             q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
             q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
             tf.summary.histogram("Q'", q)
@@ -62,9 +61,6 @@ class Model:
             Cd = tf.concat([Q, Cq], axis=1) # (batch_size, 2*hidden_size, max_q)
             Cd = tf.matmul(Cd, Ad, name='Cd') # (batch_size, 2*hidden_size, max_x)
             tf.summary.histogram('Cd', Cd)
-
-        co_att = tf.concat([D, Cd], axis=1) # (batch_size, 3*hidden_size, max_x)
-        co_att = tf.transpose(co_att, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
         
         with tf.variable_scope('encoding_understanding'):
             lstm_fw_cell = LSTMCell(self.hidden_size)
@@ -72,7 +68,10 @@ class Model:
             lstm_fw_cell = DropoutWrapper(lstm_fw_cell, input_keep_prob=keep_prob)
             lstm_bw_cell = DropoutWrapper(lstm_bw_cell, input_keep_prob=keep_prob)
 
-            u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
+            inputs_ = tf.concat([D, Cd], axis=1) # (batch_size, 3*hidden_size, max_x)
+            inputs_ = tf.transpose(co_att, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
+
+            u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=inputs_, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
     
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
             tf.summary.histogram('U', U)
@@ -127,9 +126,10 @@ class Model:
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
-                    # # for each t, send in (batch_size, hidden_size) matrix 
+                    
+                    # for each t, send in (batch_size, hidden_size) matrix 
                     alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('alpha', alpha)
+                    tf.summary.histogram('alpha_iter_' + str(step + 1), alpha)
 
                     s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
 
@@ -139,8 +139,9 @@ class Model:
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
+                    
                     beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('beta', beta)
+                    tf.summary.histogram('beta_iter_' + str(step + 1), beta)
 
                     e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     

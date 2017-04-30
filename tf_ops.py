@@ -34,56 +34,56 @@ def maxout(inputs,
         return outputs
 
 def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None):
-  """Linear map: concat(W[i] * args[i]), where W[i] is a variable.
-  Args:
-    args: a 3D Tensor with shape [batch x m x n].
-    output_size: int, second dimension of W[i] with shape [output_size x m].
-    bias: boolean, whether to add a bias term or not.
-    bias_start: starting value to initialize the bias; 0 by default.
-    scope: (optional) Variable scope to create parameters in.
-    name: (optional) variable name.
-  Returns:
-    A 3D Tensor with shape [batch x output_size x n] equal to
-    concat(W[i] * args[i]), where W[i]s are newly created matrices.
-  Raises:
-    ValueError: if some of the arguments has unspecified or wrong shape.
-  """
-  if args.get_shape().ndims != 3:
-      raise ValueError("`args` must be a 3D Tensor")
+    """Linear map: concat(W[i] * args[i]), where W[i] is a variable.
+    Args:
+        args: a 3D Tensor with shape [batch x m x n].
+        output_size: int, second dimension of W[i] with shape [output_size x m].
+        bias: boolean, whether to add a bias term or not.
+        bias_start: starting value to initialize the bias; 0 by default.
+        scope: (optional) Variable scope to create parameters in.
+        name: (optional) variable name.
+    Returns:
+        A 3D Tensor with shape [batch x output_size x n] equal to
+        concat(W[i] * args[i]), where W[i]s are newly created matrices.
+    Raises:
+        ValueError: if some of the arguments has unspecified or wrong shape.
+    """
+    if args.get_shape().ndims != 3:
+        raise ValueError("`args` must be a 3D Tensor")
 
-  shape = args.get_shape()
-  m = shape[1].value
-  n = shape[2].value
-  dtype = args.dtype
+    shape = args.get_shape()
+    m = shape[1].value
+    n = shape[2].value
+    dtype = args.dtype
 
-  # Now the computation.
-  scope = tf.get_variable_scope()
-  with tf.variable_scope(scope) as outer_scope:
-    w_name = "weights_"
-    if name is not None:
-        w_name += name
-    weights = tf.get_variable(w_name, [n, n], dtype=dtype)
-    tf.summary.histogram(w_name, weights)
-    
-    x = tf.reshape(args, [-1, n])
-    res = tf.matmul(x, weights)
-    res = tf.reshape(res, [-1, m, n])
-    
-    if not bias:
-        return res
-    
-    with tf.variable_scope(outer_scope) as inner_scope:
-        b_name = "biases_"
+    # Now the computation.
+    scope = tf.get_variable_scope()
+    with tf.variable_scope(scope) as outer_scope:
+        w_name = "weights_"
         if name is not None:
-            b_name += name
-        inner_scope.set_partitioner(None)
-        biases = tf.get_variable(
-            b_name, [m, n],
-            dtype=dtype,
-            initializer=tf.constant_initializer(bias_start, dtype=dtype))
-        tf.summary.histogram(b_name, biases)
+            w_name += name
+        weights = tf.get_variable(w_name, [n, n], dtype=dtype)
+        tf.summary.histogram(w_name, weights)
         
-  return tf.add(res, biases)
+        x = tf.reshape(args, [-1, n])
+        res = tf.matmul(x, weights)
+        res = tf.reshape(res, [-1, m, n])
+        
+        if not bias:
+            return res
+        
+        with tf.variable_scope(outer_scope) as inner_scope:
+            b_name = "biases_"
+            if name is not None:
+                b_name += name
+            inner_scope.set_partitioner(None)
+            biases = tf.get_variable(
+                b_name, [m, n],
+                dtype=dtype,
+                initializer=tf.constant_initializer(bias_start, dtype=dtype))
+            tf.summary.histogram(b_name, biases)
+            
+    return tf.add(res, biases)
 
 def _to_3d(tensor):
     if tensor.get_shape().ndims != 2:
