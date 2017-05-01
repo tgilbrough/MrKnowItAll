@@ -119,9 +119,9 @@ def main():
 
             valBatch = data.getRandomValBatch()
             feed_dict={x: valBatch['vX'],
-                    x_len: [len(trainBatch['vX'][i]) for i in range(len(trainBatch['vX']))],
+                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                     q: valBatch['vXq'],
-                    q_len: [len(trainBatch['vXq'][i]) for i in range(len(trainBatch['vX']))],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                     y_begin: valBatch['vYBegin'],
                     y_end: valBatch['vYEnd'],
                     keep_prob: 1.0}
@@ -157,9 +157,9 @@ def main():
 
 
             feed_dict={x: valBatch['vX'],
-                            x_len: [data.max_context_size] * len(valBatch['vX']),
+                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                             q: valBatch['vXq'],
-                            q_len: [data.max_ques_size] * len(valBatch['vX']),
+                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                             y_begin: valBatch['vYBegin'],
                             y_end: valBatch['vYEnd'],
                             keep_prob: 1.0}
