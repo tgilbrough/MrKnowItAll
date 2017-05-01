@@ -98,8 +98,8 @@ class Model:
         self.logits1 = alpha
         self.logits2 = beta
 
-        self.logits1 = self._alpha[-1]
-        self.logits2 = self._beta[-1]
+        #self.logits1 = self._alpha[-1]
+        #self.logits2 = self._beta[-1]
         
         self.merged_summary = tf.summary.merge_all()
     
