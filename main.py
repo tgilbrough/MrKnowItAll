@@ -6,6 +6,7 @@ import os
 import baseline_model
 import attention_model
 import coattention_model
+import linked_outputs
 
 from data import Data
 
@@ -21,7 +22,7 @@ def get_parser():
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
-                        choices=['baseline', 'attention', 'coattention'])
+                        choices=['baseline', 'attention', 'coattention', 'linked_outputs'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--pool_size', '-ps', type=int, default=16)
     parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
@@ -49,6 +50,8 @@ def main():
     elif config.model == 'coattention':
         model = coattention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using coattention model")
+    elif config.model == 'linked_outputs':
+        model = linked_outputs.Model(config, data.max_context_size, data.max_ques_size)
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
