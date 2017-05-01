@@ -83,95 +83,111 @@ class Model:
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
             tf.summary.histogram('U', U)
 
-        def batch_gather(a, b):
-            b_2 = tf.expand_dims(b, 1)
-            range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
-            ind = tf.concat([range_, b_2], axis=1)
-            return tf.gather_nd(a, ind) 
+        alpha = tf.layers.dense(U, 1, name='alpha')
+        alpha = tf.reshape(alpha, [-1, self.max_x + 1])
+        beta = tf.layers.dense(U, 1, name='beta')
+        beta = tf.reshape(beta, [-1, self.max_x + 1])
 
-        with tf.variable_scope('selector'):        
-            batch_size = tf.shape(U)[0]
+        print('alpha:', alpha.get_shape())
 
-            U_trans = tf.transpose(U, perm=[1, 0, 2]) # (max_q, batch_size, 2*hidden_size) //the u_t vectors
+        # def batch_gather(a, b):
+        #     b_2 = tf.expand_dims(b, 1)
+        #     range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
+        #     ind = tf.concat([range_, b_2], axis=1)
+        #     return tf.gather_nd(a, ind) 
 
-            # batch indices
-            loop_until = tf.range(0, batch_size, dtype=tf.int32)
+        # with tf.variable_scope('selector'):        
+        #     batch_size = tf.shape(U)[0]
 
-            # initial estimated positions
-            s = tf.zeros([batch_size], dtype=tf.int32, name='s') # (batch_size)
-            e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
+        #     U_trans = tf.transpose(U, perm=[1, 0, 2]) # (max_q, batch_size, 2*hidden_size) //the u_t vectors
 
-            # Get U vectors of starting indexes
-            u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
+        #     # batch indices
+        #     loop_until = tf.range(0, batch_size, dtype=tf.int32)
 
-            # Get U vectors of ending indexes
-            u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
+        #     # initial estimated positions
+        #     s = tf.zeros([batch_size], dtype=tf.int32, name='s') # (batch_size)
+        #     e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
 
-        with tf.variable_scope('highway_init'):
-            highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
-            highway_beta = highway_maxout(self.hidden_size, self.pool_size)
+        #     # Get U vectors of starting indexes
+        #     u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
-        self._s, self._e = [], []
-        self._alpha, self._beta = [], []
-        with tf.variable_scope('decoder') as scope:
-            # LSTM for decoding
-            lstm_dec = LSTMCell(self.hidden_size)
-            lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
+        #     # Get U vectors of ending indexes
+        #     u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
 
-            # y_begin = tf.Print(y_begin, [y_begin], message='y_begin: ')
-            # y_end = tf.Print(y_end, [y_end], message='y_end: ')
+        # with tf.variable_scope('highway_init'):
+        #     highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
+        #     highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
-            for step in range(self.max_decode_steps):
-                if step > 0:
-                    scope.reuse_variables()
+        # self._s, self._e = [], []
+        # self._alpha, self._beta = [], []
+        # with tf.variable_scope('decoder') as scope:
+        #     # LSTM for decoding
+        #     lstm_dec = LSTMCell(self.hidden_size)
+        #     lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
+
+        #     # y_begin = tf.Print(y_begin, [y_begin], message='y_begin: ')
+        #     # y_end = tf.Print(y_end, [y_end], message='y_end: ')
+
+        #     for step in range(self.max_decode_steps):
+        #         if step > 0:
+        #             scope.reuse_variables()
                 
-                _input = tf.concat([u_s, u_e], axis=1) # (batch_size, 4*hidden_size)
+        #         _input = tf.concat([u_s, u_e], axis=1) # (batch_size, 4*hidden_size)
 
-                # single step lstm
-                _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
+        #         # single step lstm
+        #         _, h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
 
-                h_state = h[0] # h_state = tf.concat(h, axis=1)
+        #         h_state = h[0] # h_state = tf.concat(h, axis=1)
                 
-                tf.summary.histogram('h_state', h_state)
+        #         tf.summary.histogram('h_state', h_state)
 
-                with tf.variable_scope('highway_alpha'):
-                    # compute start position first
-                    fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
+        #         with tf.variable_scope('highway_alpha'):
+        #             # compute start position first
+        #             fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
                     
-                    # for each t, send in (batch_size, hidden_size) matrix 
-                    alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('alpha_iter_' + str(step + 1), alpha)
+        #             # for each t, send in (batch_size, hidden_size) matrix 
+        #             alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+        #             tf.summary.histogram('alpha_iter_' + str(step + 1), alpha)
 
-                    # alpha = tf.Print(alpha, [tf.argmax(alpha, axis=0)], message='Alpha: ')
+        #             # alpha = tf.Print(alpha, [tf.argmax(alpha, axis=0)], message='Alpha: ')
 
-                    s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
+        #             s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
 
-                    # update start guess
-                    u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
+        #             # update start guess
+        #             u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
-                with tf.variable_scope('highway_beta'):
-                    # compute end position next
-                    fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
+        #         with tf.variable_scope('highway_beta'):
+        #             # compute end position next
+        #             fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
                     
-                    beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('beta_iter_' + str(step + 1), beta)
+        #             beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
+        #             tf.summary.histogram('beta_iter_' + str(step + 1), beta)
 
-                    e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
+        #             e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
                     
-                    # update end guess
-                    u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
+        #             # update end guess
+        #             u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
 
-                self._s.append(s)
-                self._e.append(e)
-                self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
-                self._beta.append(tf.reshape(beta, [batch_size, -1]))   
+        #         self._s.append(s)
+        #         self._e.append(e)
+        #         self._alpha.append(tf.reshape(alpha, [batch_size, -1]))
+        #         self._beta.append(tf.reshape(beta, [batch_size, -1]))   
 
-        self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
+        with tf.variable_scope('loss'):
+            loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=alpha), name='beginning_loss')
+            loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=beta), name='ending_loss')
+            loss = loss1 + loss2
+
+        self.loss = loss
+        # self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
 
         tf.summary.scalar('loss', self.loss)
 
-        self.logits1 = self._alpha[-1]
-        self.logits2 = self._beta[-1]
+        self.logits1 = alpha
+        self.logits2 = beta
+
+        # self.logits1 = self._alpha[-1]
+        # self.logits2 = self._beta[-1]
         
         self.merged_summary = tf.summary.merge_all()
     
