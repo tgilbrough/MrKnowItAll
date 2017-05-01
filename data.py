@@ -151,21 +151,22 @@ class Data:
         return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
 
     def join(self, sent):
+        def join_punctuation(seq, characters='.,;?!'):
+            characters = set(characters)
+            seq = iter(seq)
+            current = next(seq)
+
+            for nxt in seq:
+                if nxt in characters:
+                    current += nxt
+                else:
+                    yield current
+                    current = nxt
+
+            yield current
         return ' '.join(join_punctuation(sent))
 
-    def join_punctuation(seq, characters='.,;?!'):
-        characters = set(characters)
-        seq = iter(seq)
-        current = next(seq)
-
-        for nxt in seq:
-            if nxt in characters:
-                current += nxt
-            else:
-                yield current
-                current = nxt
-
-        yield current
+    
 
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
