@@ -39,6 +39,7 @@ def get_args():
     parser.add_argument('--batch_size', '-bs', type=int, default=64, nargs='+')
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, nargs='+')
     parser.add_argument('--model', '-m', default='baseline', nargs='+', choices=MODELS + ['all'])
+    parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
 
     args = vars(parser.parse_args())
     if 'all' in args['question_type']:

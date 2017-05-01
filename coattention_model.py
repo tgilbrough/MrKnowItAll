@@ -27,7 +27,7 @@ class Model:
             question = tf.nn.embedding_lookup(emb_mat, q, name='question') # (batch_size, max_q, emb_size)
 
         with tf.variable_scope('encoding') as scope:
-            lstm_enc = LSTMCell(self.hidden_size)
+            lstm_enc = LSTMCell(self.hidden_size) 
             lstm_enc = DropoutWrapper(lstm_enc, input_keep_prob=keep_prob)
         
             # Add sentinel to end of encodings
@@ -200,7 +200,7 @@ class Model:
         return tf.reduce_sum([loss_alpha, loss_beta], name='loss')
 
     def _loss_shared(self, logits, labels):
-        # labels = tf.reshape(labels, [self._params.batch_size])
+        labels = tf.reshape(labels, [-1])
         cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=labels, name='per_step_cross_entropy')
         cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
         tf.add_to_collection('per_step_losses', cross_entropy_mean)
