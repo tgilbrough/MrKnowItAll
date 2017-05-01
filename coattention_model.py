@@ -84,7 +84,7 @@ class Model:
         beta = tf.layers.dense(U, 1, name='beta')
         beta = tf.reshape(beta, [-1, self.max_x + 1])
 
-        print('alpha:', alpha.get_shape())
+        
 
         # def batch_gather(a, b):
         #     b_2 = tf.expand_dims(b, 1)
