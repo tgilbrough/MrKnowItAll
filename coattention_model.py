@@ -41,13 +41,9 @@ class Model:
 
             scope.reuse_variables()
 
-            q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
-            q = tf.map_fn(lambda x: fn(x), q, dtype=tf.float32)
-            q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
-            tf.summary.histogram('Q_', q)
-
-        with tf.variable_scope('transforming_question'):
-            Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
+            Q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
+            Q = tf.map_fn(lambda x: fn(x), Q, dtype=tf.float32)
+            Q = tf.transpose(Q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
             tf.summary.histogram('Q', Q)   
 
         with tf.variable_scope('affinity_mat'):
