@@ -124,6 +124,7 @@ def main():
             feed_dict={x: valBatch['vX'],
                     x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                     q: valBatch['vXq'],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],
                     q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                     y_begin: valBatch['vYBegin'],
                     y_end: valBatch['vYEnd'],
