@@ -79,9 +79,10 @@ class Model:
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
             tf.summary.histogram('U', U)
 
-        alpha = tf.layers.dense(U, 1, name='alpha')
-        alpha = tf.reshape(alpha, [-1, self.max_x + 1])
-        beta = tf.layers.dense(U, 1, name='beta')
+        alpha = tf.layers.dense(U, 1, name='alpha') # (batch_size, max_x, 1)
+        beta = tf.layers.dense(tf.concat([U, alpha], axis=2), 1, name='beta')
+        
+        alpha = tf.reshape(alpha, [-1, self.max_x + 1]) # (batch_size, max_x)
         beta = tf.reshape(beta, [-1, self.max_x + 1])
 
 
@@ -98,8 +99,8 @@ class Model:
         self.logits1 = alpha
         self.logits2 = beta
 
-        #self.logits1 = self._alpha[-1]
-        #self.logits2 = self._beta[-1]
+        # self.logits1 = self._alpha[-1]
+        # self.logits2 = self._beta[-1]
         
         self.merged_summary = tf.summary.merge_all()
     
