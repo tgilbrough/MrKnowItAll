@@ -54,6 +54,9 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
     n = shape[2].value
     dtype = args.dtype
 
+    print('args:', args.get_shape())
+    print('output_size:', output_size)
+
     # Now the computation.
     scope = tf.get_variable_scope()
     with tf.variable_scope(scope) as outer_scope:
@@ -61,7 +64,12 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
         if name is not None: w_name += name
         weights = tf.get_variable(w_name, [output_size, m], dtype=dtype)
         
-        res = tf.map_fn(lambda x: tf.matmul(weights, x), args)
+        X_list = tf.unstack(args, axis=2)
+        
+        newX_list = [tf.matmul(weights,tf.transpose(x)) for x in X_list]
+
+        res = tf.transpose(tf.stack(newX_list),[2,1,0])
+
         if not bias:
             return res
         with tf.variable_scope(outer_scope) as inner_scope:
