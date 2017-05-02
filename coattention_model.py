@@ -62,7 +62,7 @@ class Model:
 
         with tf.variable_scope('attention_questions'):
             Cd = tf.concat([Q, tf.transpose(Cq, perm=[0, 2, 1])], axis=1) # (batch_size, 2*hidden_size, max_q)
-            Cd = tf.matmul(Cd, Ad, adjoint_b=True, name='Cd') # (batch_size, 2*hidden_size, max_x)
+            Cd = tf.matmul(Cd, Ad, transpose_b=True, name='Cd') # (batch_size, 2*hidden_size, max_x)
             tf.summary.histogram('Cd', Cd)
         
         with tf.variable_scope('encoding_understanding'):
@@ -96,16 +96,6 @@ class Model:
             s = tf.zeros([batch_size], dtype=tf.int32, name='s') # (batch_size)
             e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
 
-            alpha = tf.layers.dense(U, 1, name='s')
-            alpha = tf.reshape(alpha, [-1, self.max_x + 1])
-            s = tf.reshape(tf.cast(tf.argmax(alpha, axis=1), tf.int32), [batch_size]) 
-
-
-            beta = tf.layers.dense(U, 1, name='e')
-            beta = tf.reshape(beta, [-1, self.max_x + 1])
-            e = tf.reshape(tf.cast(tf.argmax(beta, axis=1), tf.int32), [batch_size])
-
-
             # Get U vectors of starting indexes
             u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
@@ -117,7 +107,7 @@ class Model:
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
         self._s, self._e = [], []
-        self._alpha, self._beta = [alpha], [beta]
+        self._alpha, self._beta = [], []
         with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
             lstm_dec = LSTMCell(self.hidden_size)

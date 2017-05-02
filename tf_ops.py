@@ -1,6 +1,8 @@
 import tensorflow as tf
+from tensorflow.contrib.layers.python.layers import utils
+from tensorflow.python.framework import ops
 
-def maxout(inputs, num_units, axis=None):
+def maxout(inputs, num_units, axis=None, outputs_collections=None, scope=None):
         """Adds a maxout op which is a max pooling performed in filter/channel
         dimension. This can also be used after fully-connected layers to reduce
         number of features.
@@ -17,19 +19,19 @@ def maxout(inputs, num_units, axis=None):
         Raises:
             ValueError: if num_units is not multiple of number of features.
         """
-        shape = inputs.get_shape().as_list()
-        if shape[0] is None:
-            shape[0] = -1
-        if axis is None:  # Assume that channel is the last dimension
-            axis = -1
-        num_channels = shape[axis]
-        if num_channels % num_units:
-            raise ValueError('number of features({}) is not '
-                            'a multiple of num_units({})'.format(num_channels, num_units))
-        shape[axis] = num_units
-        shape += [num_channels // num_units]
-        outputs = tf.reduce_max(tf.reshape(inputs, shape), -1, keep_dims=False)
-        return outputs
+        with ops.name_scope(scope, 'MaxOut', [inputs]) as sc:
+            inputs = ops.convert_to_tensor(inputs)
+            shape = inputs.get_shape().as_list()
+            if axis is None:  # Assume that channel is the last dimension
+                axis = -1
+            num_channels = shape[axis]
+            if num_channels % num_units:
+                raise ValueError('number of features({}) is not '
+                                'a multiple of num_units({})'.format(num_channels, num_units))
+            shape[axis] = -1
+            shape += [num_channels // num_units]
+            outputs = tf.reduce_max(tf.reshape(inputs, shape), -1, keep_dims=False)
+            return utils.collect_named_outputs(outputs_collections, sc, outputs)
 
 def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None):
     """Linear map: concat(W[i] * args[i]), where W[i] is a variable.
