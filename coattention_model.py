@@ -47,8 +47,7 @@ class Model:
             tf.summary.histogram('Q_', q)
 
         with tf.variable_scope('transforming_question'):
-            Q = tf.tanh(batch_linear(q, self.hidden_size, True)) # (batch_size, hidden_size, max_q)
-            tf.summary.histogram('Q', Q)   
+            Q = q 
 
         with tf.variable_scope('affinity_mat'):
             L = tf.matmul(D, Q, name='L', transpose_a=True) # (batch_size, max_x, max_q)
@@ -101,6 +100,16 @@ class Model:
             s = tf.zeros([batch_size], dtype=tf.int32, name='s') # (batch_size)
             e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
 
+            alpha = tf.layers.dense(U, 1, name='s')
+            alpha = tf.reshape(alpha, [-1, self.max_x + 1])
+            s = tf.reshape(tf.cast(tf.argmax(alpha, axis=1), tf.int32), [batch_size]) 
+
+
+            beta = tf.layers.dense(U, 1, name='e')
+            beta = tf.reshape(beta, [-1, self.max_x + 1])
+            e = tf.reshape(tf.cast(tf.argmax(beta, axis=1), tf.int32), [batch_size])
+
+
             # Get U vectors of starting indexes
             u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
 
@@ -112,7 +121,7 @@ class Model:
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
         self._s, self._e = [], []
-        self._alpha, self._beta = [], []
+        self._alpha, self._beta = [alpha], [beta]
         with tf.variable_scope('decoder') as scope:
             # LSTM for decoding
             lstm_dec = LSTMCell(self.hidden_size)

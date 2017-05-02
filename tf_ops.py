@@ -54,9 +54,6 @@ def batch_linear(args, output_size, bias, bias_start=0.0, scope=None, name=None)
     n = shape[2].value
     dtype = args.dtype
 
-    print('args:', args.get_shape())
-    print('output_size:', output_size)
-
     # Now the computation.
     scope = tf.get_variable_scope()
     with tf.variable_scope(scope) as outer_scope:
