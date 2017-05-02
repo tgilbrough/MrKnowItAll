@@ -6,22 +6,23 @@ import os
 import baseline_model
 import attention_model
 import coattention_model
+import linked_outputs
 
 from data import Data
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--keep_prob', '-kp', type=float, default=0.7)
-    parser.add_argument('--hidden_size', '-hs', type=int, default=100)
+    parser.add_argument('--keep_prob', '-kp', type=float, default=0.5)
+    parser.add_argument('--hidden_size', '-hs', type=int, default=50)
     parser.add_argument('--emb_size', '-es', type=int, default=50) # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--question_type', '-q', default='location',
                         choices=['description', 'entity', 'location', 'numeric', 'person'])
     parser.add_argument('--epochs', '-e', type=int, default=50)
-    parser.add_argument('--batch_size', '-b', type=int, default=64)
+    parser.add_argument('--batch_size', '-b', type=int, default=256)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
-                        choices=['baseline', 'attention', 'coattention'])
+                        choices=['baseline', 'attention', 'coattention', 'linked_outputs'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--pool_size', '-ps', type=int, default=16)
     parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
@@ -49,6 +50,8 @@ def main():
     elif config.model == 'coattention':
         model = coattention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using coattention model")
+    elif config.model == 'linked_outputs':
+        model = linked_outputs.Model(config, data.max_context_size, data.max_ques_size)
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
@@ -66,31 +69,15 @@ def main():
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
-    outputs = model.build(x, x_len, q, q_len, data.embeddings, keep_prob)
-
-    print('Computation graph completed.')
-
     # Place holder for just index of answer within context
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    with tf.variable_scope('loss'):
-        logits1, logits2 = outputs['logits_start'], outputs['logits_end']
-        loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits1), name='beginning_loss')
-        loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits2), name='ending_loss')
-        loss = loss1 + loss2
-    with tf.variable_scope('accuracy'):
-        acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits1, 1), 'int32')), 'float'), name='beginning_accuracy')
-        acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits2, 1), 'int32')), 'float'), name='ending_accuracy')
+    model.build(x, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
 
-    tf.summary.scalar("loss", loss)
-    tf.summary.scalar("loss1", loss1)
-    tf.summary.scalar("loss2", loss2)
-    tf.summary.scalar("accuracy1", acc1)
-    tf.summary.scalar("accuracy2", acc2)
-    merged_summary = tf.summary.merge_all()
+    print('Computation graph completed.')
 
-    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(loss)
+    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(model.loss)
 
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
@@ -115,34 +102,34 @@ def main():
                 trainBatch = data.getRandomTrainBatch()
 
                 feed_dict={x: trainBatch['tX'],
-                            x_len: [data.max_context_size] * len(trainBatch['tX']),
+                            x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                             q: trainBatch['tXq'],
-                            q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                            q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
                             y_begin: trainBatch['tYBegin'],
                             y_end: trainBatch['tYEnd'],
                             keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
 
-
             # Record results for tensorboard, once per epoch
             feed_dict={x: trainBatch['tX'],
-                    x_len: [data.max_context_size] * len(trainBatch['tX']),
+                    x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                     q: trainBatch['tXq'],
-                    q_len: [data.max_ques_size] * len(trainBatch['tX']),
+                    q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
                     y_begin: trainBatch['tYBegin'],
                     y_end: trainBatch['tYEnd'],
                     keep_prob: 1.0}
-            train_sum = sess.run(merged_summary, feed_dict=feed_dict)
+            train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
 
             valBatch = data.getRandomValBatch()
             feed_dict={x: valBatch['vX'],
-                    x_len: [data.max_context_size] * len(valBatch['vX']),
+                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                     q: valBatch['vXq'],
-                    q_len: [data.max_ques_size] * len(valBatch['vX']),
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                     y_begin: valBatch['vYBegin'],
                     y_end: valBatch['vYEnd'],
                     keep_prob: 1.0}
-            val_sum, val_loss  = sess.run([merged_summary, loss], feed_dict=feed_dict)
+            val_sum, val_loss  = sess.run([model.merged_summary, model.loss], feed_dict=feed_dict)
             if val_loss < min_val_loss:
                 saver.save(sess, save_model_path + '/model')
                 min_val_loss = val_loss
@@ -169,14 +156,14 @@ def main():
         for i in range(number_of_val_batches):
             valBatch = data.getValBatch()
 
-            prediction_begin = tf.cast(tf.argmax(logits1, 1), 'int32')
-            prediction_end = tf.cast(tf.argmax(logits2, 1), 'int32')
+            prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
+            prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
 
 
             feed_dict={x: valBatch['vX'],
-                            x_len: [data.max_context_size] * len(valBatch['vX']),
+                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                             q: valBatch['vXq'],
-                            q_len: [data.max_ques_size] * len(valBatch['vX']),
+                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                             y_begin: valBatch['vYBegin'],
                             y_end: valBatch['vYEnd'],
                             keep_prob: 1.0}

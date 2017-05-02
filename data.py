@@ -150,6 +150,24 @@ class Data:
         '''
         return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
 
+    def join(self, sent):
+        def join_punctuation(seq, characters='.,;?!'):
+            characters = set(characters)
+            seq = iter(seq)
+            current = next(seq)
+
+            for nxt in seq:
+                if nxt in characters:
+                    current += nxt
+                else:
+                    yield current
+                    current = nxt
+
+            yield current
+        return ' '.join(join_punctuation(sent))
+
+    
+
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
            and keep track of max context and question lengths.
@@ -252,7 +270,7 @@ class Data:
 
         for i in range(len(vContext)):
             predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
-            trueAnswer =' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
+            trueAnswer = ' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
 
             reference = {}
             candidate = {}
