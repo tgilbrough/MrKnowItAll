@@ -32,40 +32,37 @@ class Model:
         
             # Add sentinel to end of encodings
             sentinel = tf.get_variable('sentinel', [1, self.hidden_size], dtype=tf.float32)
-            fn = lambda x: tf.concat([x, sentinel], axis=0)
+            append_sentinel = lambda x: tf.concat([x, sentinel], axis=0)
 
             D, _ = tf.nn.dynamic_rnn(lstm_enc, context, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
-            D = tf.map_fn(lambda x: fn(x), D, dtype=tf.float32)
-            D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)            
+            D = tf.map_fn(append_sentinel, D, dtype=tf.float32)  # (batch_size, max_x+1, hidden_size) // just going to say max_x instead of max_x + 1 for simplicity
+            # D = tf.transpose(D, perm=[0, 2, 1]) # (batch_size, hidden_size, max_x)            
             tf.summary.histogram('D', D)
 
             scope.reuse_variables()
 
-            q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
-            q = tf.map_fn(lambda x: fn(x), q, dtype=tf.float32)
-            q = tf.transpose(q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
-            tf.summary.histogram('Q_', q)
-
-        with tf.variable_scope('transforming_question'):
-            Q = q 
+            Q, _ = tf.nn.dynamic_rnn(lstm_enc, question, sequence_length=q_len, dtype=tf.float32) # (batch_size, max_q, hidden_size)
+            Q = tf.map_fn(append_sentinel, Q, dtype=tf.float32) # (batch_size, max_q+1, hidden_size) // just going to say max_q instead of max_q + 1 for simplicity
+            Q = tf.transpose(Q, perm=[0, 2, 1]) # (batch_size, hidden_size, max_q)
+            tf.summary.histogram('Q', Q)
 
         with tf.variable_scope('affinity_mat'):
-            L = tf.matmul(D, Q, name='L', transpose_a=True) # (batch_size, max_x, max_q)
+            L = tf.matmul(D, Q, name='L') # (batch_size, max_x, max_q)
             tf.summary.histogram('L', L)
 
         with tf.variable_scope('normalize_aff'):
-            Aq = tf.nn.softmax(L, name='Aq') # (batch_size, max_x, max_q)
-            Ad = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Ad') # (batch_size, max_q, max_x)
+            Ad = tf.nn.softmax(L, name='Aq') # (batch_size, max_x, max_q)
+            Aq = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Ad') # (batch_size, max_q, max_x)
             tf.summary.histogram('Aq', Aq)
             tf.summary.histogram('Ad', Ad)
 
         with tf.variable_scope('attention_contexts'):
-            Cq = tf.matmul(D, Aq, name='Cq') # (batch_size, hidden_size, max_q)
+            Cq = tf.matmul(Aq, D, name='Cq') # (batch_size, hidden_size, max_q)
             tf.summary.histogram('Cq', Cq)
 
         with tf.variable_scope('attention_questions'):
-            Cd = tf.concat([Q, Cq], axis=1) # (batch_size, 2*hidden_size, max_q)
-            Cd = tf.matmul(Cd, Ad, name='Cd') # (batch_size, 2*hidden_size, max_x)
+            Cd = tf.concat([Q, tf.transpose(Cq, perm=[0, 2, 1])], axis=1) # (batch_size, 2*hidden_size, max_q)
+            Cd = tf.matmul(Cd, Ad, adjoint_b=True, name='Cd') # (batch_size, 2*hidden_size, max_x)
             tf.summary.histogram('Cd', Cd)
         
         with tf.variable_scope('encoding_understanding'):
@@ -74,10 +71,9 @@ class Model:
             lstm_fw_cell = DropoutWrapper(lstm_fw_cell, input_keep_prob=keep_prob)
             lstm_bw_cell = DropoutWrapper(lstm_bw_cell, input_keep_prob=keep_prob)
 
-            inputs_ = tf.concat([D, Cd], axis=1) # (batch_size, 3*hidden_size, max_x)
-            inputs_ = tf.transpose(inputs_, perm=[0, 2, 1]) # (batch_size, max_x, 3*hidden_size)
+            co_att = tf.concat([D, tf.transpose(Cd, perm=[0, 2, 1])], axis=2) # (batch_size, 3*hidden_size, max_x)
 
-            u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=inputs_, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
+            u, _ = tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell, lstm_bw_cell, inputs=co_att, sequence_length=x_len, dtype=tf.float32) # (batch_size, max_x, hidden_size)
     
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
             tf.summary.histogram('U', U)
