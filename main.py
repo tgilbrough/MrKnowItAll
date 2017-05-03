@@ -96,6 +96,12 @@ def main():
 
         sess.run(tf.global_variables_initializer())
 
+        tvars = tf.trainable_variables()
+        tvars_vals = sess.run(tvars)
+
+        for var, val in zip(tvars, tvars_vals):
+            print(var.name)
+
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
             for i in tqdm(range(number_of_train_batches)):
