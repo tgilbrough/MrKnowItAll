@@ -51,8 +51,8 @@ class Model:
             tf.summary.histogram('L', L)
 
         with tf.variable_scope('normalize_aff'):
-            Ad = tf.nn.softmax(L, name='Aq') # (batch_size, max_x, max_q)
-            Aq = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Ad') # (batch_size, max_q, max_x)
+            Ad = tf.nn.softmax(L, name='Ad') # (batch_size, max_x, max_q)
+            Aq = tf.nn.softmax(tf.transpose(L, perm=[0, 2, 1]), name='Aq') # (batch_size, max_q, max_x)
             tf.summary.histogram('Aq', Aq)
             tf.summary.histogram('Ad', Ad)
 
@@ -68,8 +68,6 @@ class Model:
         with tf.variable_scope('encoding_understanding'):
             lstm_fw_cell = LSTMCell(self.hidden_size)
             lstm_bw_cell = LSTMCell(self.hidden_size)
-            lstm_fw_cell = DropoutWrapper(lstm_fw_cell, input_keep_prob=keep_prob)
-            lstm_bw_cell = DropoutWrapper(lstm_bw_cell, input_keep_prob=keep_prob)
 
             co_att = tf.concat([D, tf.transpose(Cd, perm=[0, 2, 1])], axis=2) # (batch_size, 3*hidden_size, max_x)
 
@@ -78,11 +76,10 @@ class Model:
             U = tf.concat(u, axis=2) # (batch_size, max_x, 2*hidden_size)
             tf.summary.histogram('U', U)
 
-        def batch_gather(a, b):
-            b_2 = tf.expand_dims(b, 1)
-            range_ = tf.expand_dims(tf.range(tf.shape(b)[0]), 1)
-            ind = tf.concat([range_, b_2], axis=1)
-            return tf.gather_nd(a, ind) 
+        def select(u, pos, idx):
+            u_idx = tf.gather(u, idx)
+            pos_idx = tf.gather(pos, idx)
+            return tf.reshape(tf.gather(u_idx, pos_idx), [-1])
 
         with tf.variable_scope('selector'):        
             batch_size = tf.shape(U)[0]
@@ -97,21 +94,25 @@ class Model:
             e = tf.zeros([batch_size], dtype=tf.int32, name='e') # (batch_size)
 
             # Get U vectors of starting indexes
-            u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
+            fn = lambda idx: select(U, s, idx)
+            u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
             # Get U vectors of ending indexes
-            u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
+            fn = lambda idx: select(U, e, idx)
+            u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
         with tf.variable_scope('highway_init'):
+            # LSTM for decoding
+            lstm_dec = LSTMCell(self.hidden_size)
+            lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
+
             highway_alpha = highway_maxout(self.hidden_size, self.pool_size)
             highway_beta = highway_maxout(self.hidden_size, self.pool_size)
 
         self._s, self._e = [], []
         self._alpha, self._beta = [], []
         with tf.variable_scope('decoder') as scope:
-            # LSTM for decoding
-            lstm_dec = LSTMCell(self.hidden_size)
-            lstm_dec = DropoutWrapper(lstm_dec, input_keep_prob=keep_prob)
+            
 
             for step in range(self.max_decode_steps):
                 if step > 0:
@@ -120,7 +121,7 @@ class Model:
                 _input = tf.concat([u_s, u_e], axis=1) # (batch_size, 4*hidden_size)
 
                 # single step lstm
-                h,_ = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
+                _,h = tf.contrib.rnn.static_rnn(lstm_dec, [_input], dtype=tf.float32) # (batch_size, hidden_size)
 
                 h_state = h[0] # h_state = tf.concat(h, axis=1)
                 
@@ -129,27 +130,21 @@ class Model:
                 with tf.variable_scope('highway_alpha'):
                     # compute start position first
                     fn = lambda u_t: highway_alpha(u_t, h_state, u_s, u_e)
-                    
-                    # for each t, send in (batch_size, hidden_size) matrix 
-                    alpha = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('alpha_iter_' + str(step + 1), alpha)
-
-                    s = tf.reshape(tf.cast(tf.argmax(alpha, axis=0), tf.int32), [batch_size]) # (batch_size)
+                    alpha = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32)
+                    s = tf.reshape(tf.argmax(alpha, 0), [batch_size])
 
                     # update start guess
-                    u_s = batch_gather(U, s) # (batch_size, 2*hidden_size)
+                    fn = lambda idx: select(U, s, idx)
+                    u_s = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
                 with tf.variable_scope('highway_beta'):
                     # compute end position next
                     fn = lambda u_t: highway_beta(u_t, h_state, u_s, u_e)
-                    
-                    beta = tf.map_fn(fn, U_trans, dtype=tf.float32) # (max_x, batch_size, 1, 1)
-                    tf.summary.histogram('beta_iter_' + str(step + 1), beta)
-
-                    e = tf.reshape(tf.cast(tf.argmax(beta, axis=0), tf.int32), [batch_size]) # (batch_size)
-                    
+                    beta = tf.map_fn(lambda u_t: fn(u_t), U_trans, dtype=tf.float32)
+                    e = tf.reshape(tf.argmax(beta, 0), [batch_size])
                     # update end guess
-                    u_e = batch_gather(U, e) # (batch_size, 2*hidden_size)
+                    fn = lambda idx: select(U, e, idx)
+                    u_e = tf.map_fn(lambda idx: fn(idx), loop_until, dtype=tf.float32)
 
                 self._s.append(s)
                 self._e.append(e)
