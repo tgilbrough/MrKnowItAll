@@ -71,10 +71,16 @@ class Model:
             logits = tf.matmul(xq_flat, weights, name='apply_weights')
             logits = tf.add(logits, bias, name='add_bias')
 
+        self.logits = logits
+
         with tf.variable_scope('loss'):
             loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='loss')
+        with tf.variable_scope('accuracy'):
+            acc = tf.reduce_mean(tf.cast(tf.equal(y, tf.cast(tf.argmax(logits, 1), 'int32')), 'float'), name='accuracy')
 
         tf.summary.scalar('loss', loss)
+        tf.summary.scalar('accuracy', acc)
+       
 
         self.loss = loss
         self.merged_summary = tf.summary.merge_all()

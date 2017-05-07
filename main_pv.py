@@ -131,28 +131,24 @@ def main():
         vQuestionID = []
         predictedBegin = []
         predictedEnd = []
-        trueBegin = []
-        trueEnd = []
 
-        begin_corr = 0
-        end_corr = 0
         total = 0
 
         for i in range(number_of_val_batches):
             valBatch = data.getValBatch()
 
-            prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
-            prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
-
+            prediction = tf.cast(tf.argmax(model.logits, 1), 'int32')
 
             feed_dict={x: valBatch['vX'],
-                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
-                            q: valBatch['vXq'],
-                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
-                            y_begin: valBatch['vYBegin'],
-                            y_end: valBatch['vYEnd'],
-                            keep_prob: 1.0}
-            begin, end = sess.run([prediction_begin, prediction_end], feed_dict=feed_dict)
+                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
+                    q: valBatch['vXq'],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],
+                    y: valBatch['vY'],
+                    keep_prob: 1.0}
+            selected_pred = sess.run([prediction], feed_dict=feed_dict)
+
+            for j in range(len(y)):
+                print(y[j], selected_pred[j])
 
 if __name__ == "__main__":
     main()
