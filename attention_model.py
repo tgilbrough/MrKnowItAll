@@ -48,7 +48,7 @@ class Model:
             inputs = tf.concat([x_exp, q_exp, x_exp * q_exp], 3)
             mask = tf.tile(tf.expand_dims(x_mask, -1), [1, 1, self.max_q]) & tf.expand_dims(q_mask, 1)
             val = tf.reshape(tf.layers.dense(inputs=inputs, units=1), [-1, self.max_x, self.max_q])
-            logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10
+            logits = val - (1.0 - tf.cast(mask, 'float')) 
             probs = tf.nn.softmax(logits)
             sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2)
             tf.summary.histogram('sum_q', sum_q)

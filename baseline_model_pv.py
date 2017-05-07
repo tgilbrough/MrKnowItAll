@@ -11,17 +11,14 @@ class Model:
         self.max_q = max_q
         self.saver = None
 
-    def build(self, xs, x_len, q, q_len, y, embeddings, keep_prob):
+    def build(self, x, x_len, q, q_len, y, embeddings, keep_prob):
         with tf.variable_scope('embedding_matrix'):
             # embeddings matrix, may be memory ineffecient (Fix)
             emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
             tf.summary.histogram('emb_mat', emb_mat)
 
         with tf.variable_scope('embedding_passages'):
-            context = []
-            
-            for x in xs:
-                context.append(tf.nn.embedding_lookup(emb_mat, x, name='context'))
+            context = tf.nn.embedding_lookup(emb_mat, x, name='context')
 
         with tf.variable_scope('embedding_question'):
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
@@ -30,15 +27,10 @@ class Model:
             gru_c_cell = GRUCell(self.dim)
             gru_c_cell = DropoutWrapper(gru_c_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            context_output = []
-            for i in range(len(context)):
-                if i > 0:
-                    scope.reuse_variables()
-                outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context[i], sequence_length=x_len, dtype=tf.float32)
-                context_fw, context_bw = outputs_context
-                context_output.append(tf.concat([context_fw, context_bw], axis=2))
-                # tf.summary.histogram('context_output', context_output)
-            context_output = tf.concat(context_output, axis=2)
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
+            context_fw, context_bw = outputs_context
+            # tf.summary.histogram('context_output', context_output)
+            context_output = tf.concat([context_fw, context_bw], axis=2)
 
         with tf.variable_scope('encoding_question'):
             gru_q_cell = GRUCell(self.dim)
@@ -72,10 +64,12 @@ class Model:
             tf.summary.histogram('xq_output', xq_output)
 
         # logits
-        with tf.variable_scope('relevance'):
-            logits = tf.layers.dense(inputs=xq_output, units=1)
-
-        print(y.get_shape(), logits.get_shape())
+        with tf.variable_scope('logits'):
+            xq_flat = tf.reshape(xq_output, [-1, 2 * self.max_x * self.dim])
+            weights = tf.Variable(tf.random_normal([2 * self.max_x * self.dim, 2], name='weights'))
+            bias = tf.Variable(tf.random_normal([1, 2], name='bias'))
+            logits = tf.matmul(xq_flat, weights, name='apply_weights')
+            logits = tf.add(logits, bias, name='add_bias')
 
         with tf.variable_scope('loss'):
             loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='loss')
