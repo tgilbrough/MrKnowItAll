@@ -131,11 +131,7 @@ def main():
         vQuestionID = []
         predictedBegin = []
         predictedEnd = []
-        trueBegin = []
-        trueEnd = []
 
-        begin_corr = 0
-        end_corr = 0
         total = 0
 
 
@@ -145,15 +141,15 @@ def main():
             prediction = tf.cast(tf.argmax(model.logits, 1), 'int32')
 
             feed_dict={x: valBatch['vX'],
-                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
-                            q: valBatch['vXq'],
-                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
-                            y: valBatch['vY'],
-                            keep_prob: 1.0}
+                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
+                    q: valBatch['vXq'],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],
+                    y: valBatch['vY'],
+                    keep_prob: 1.0}
             selected_pred = sess.run([prediction], feed_dict=feed_dict)
+
             for j in range(len(y)):
                 print(y[j], selected_pred[j])
-
 
 if __name__ == "__main__":
     main()
