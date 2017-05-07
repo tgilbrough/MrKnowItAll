@@ -52,16 +52,16 @@ def main():
     print('Building tensorflow computation graph...')
 
     # shape = batch_size by num_features
-    xs = [tf.placeholder(tf.int32, shape=[None, data.tX[0][i].shape[0]], name='x'+str(i)) for i in range(data.max_passages)]
+    x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
     q = tf.placeholder(tf.int32, shape=[None, data.tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
     # Place holder for just index of answer within context
-    y = tf.placeholder(tf.int32, [None, data.max_passages], name='y')
+    y = tf.placeholder(tf.int32, [None], name='y')
 
-    model.build(xs, x_len, q, q_len, y, data.embeddings, keep_prob)
+    model.build(x, x_len, q, q_len, y, data.embeddings, keep_prob)
 
     print('Computation graph completed.')
 
@@ -89,21 +89,17 @@ def main():
             for i in tqdm(range(number_of_train_batches)):
                 trainBatch = data.getRandomTrainBatch()
 
-                feed_dict={
-                    x_len: [data.max_context_size] * len(trainBatch['tX'][0]),
-                    q: trainBatch['tXq'],
-                    q_len: [data.max_ques_size] * len(trainBatch['tX'][0]),
+                feed_dict={x: trainBatch['tX'],
+                    x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                            q: trainBatch['tXq'],
+                            q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
                     y: trainBatch['tY'],
                     keep_prob: config.keep_prob}
-                count = 0
-                for x in xs:
-                    feed_dict[x] = trainBatch['tX'][count]
-                    count += 1
 
                 sess.run(train_step, feed_dict=feed_dict)
 
             # Record results for tensorboard, once per epoch
-            feed_dict={xs: trainBatch['tX'],
+            feed_dict={x: trainBatch['tX'],
                     x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                     q: trainBatch['tXq'],
                     q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
@@ -112,7 +108,7 @@ def main():
             train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
 
             valBatch = data.getRandomValBatch()
-            feed_dict={xs: valBatch['vX'],
+            feed_dict={x: valBatch['vX'],
                     x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                     q: valBatch['vXq'],
                     q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],

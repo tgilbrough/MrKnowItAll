@@ -15,25 +15,22 @@ class Data:
         # load training data, parse, and split
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
-        self.tContext, self.tQuestion, self.tY, self.maxLenTContext, \
-                                     self.maxLenTQuestion, self.maxTPassages = self.splitMsmarcoDatasets(trainData)
+        self.tContext, self.tQuestion, self.tY, self.maxLenTContext, self.maxLenTQuestion = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
-        self.vContext, self.vQuestion, self.vY, self.maxLenVContext, self.maxLenVQuestion, \
-                                        self.maxVPassages = self.splitMsmarcoDatasets(valData)
+        self.vContext, self.vQuestion, self.vY, self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
-        vocab = self.buildVocab([c for x in self.tContext for c in x] + self.tQuestion + [c for x in self.vContext for c in x] + self.vQuestion)
+        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
         self.vocab_size = len(vocab) + 1
         word_index = dict((c, i + 1) for i, c in enumerate(vocab))
         self.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
         self.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
-        self.max_passages = max(self.maxTPassages, self.maxVPassages)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         print('Preparing embedding matrix.')
@@ -75,8 +72,6 @@ class Data:
         tX_batch = self.tX[points]
         tXq_batch = self.tXq[points]
         tY_batch = self.tY[points]
-
-        tX_batch = np.transpose(tX_batch, axes=(1, 0, 2))
 
         return {'tX': tX_batch, 'tXq': tXq_batch, 'tY': tY_batch}
 
@@ -157,47 +152,33 @@ class Data:
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
            and keep track of max context and question lengths.
         '''
-        xContext = [] # list of list of contexts paragraphs
+        xContext = [] # list of contexts paragraphs
         xQuestion = [] # list of questions
-        xSelected = [] # list of list of selected values
+        xSelected = [] # list of selected values
         maxLenContext = 0
         maxLenQuestion = 0
-        maxPassages = 0
 
         for sample in f['data']:
-            passages = []
-            selected = []
             for passage in sample['passages']:
                 context = passage['passage_text']
                 context = context.replace("''", '" ')
                 context = context.replace("``", '" ')
                 contextTokenized = self.tokenize(context.lower())
                 contextLength = len(contextTokenized)
+                
                 if contextLength > maxLenContext:
                     maxLenContext = contextLength
-                passages.append(contextTokenized)
-                selected.append(passage['is_selected'])
 
-            if len(passages) > maxPassages:
-                maxPassages = len(passages)
+                xContext.append(contextTokenized)
+                xSelected.append(passage['is_selected'])
 
-            xContext.append(passages)
-            xSelected.append(selected)
+                question = sample['query']
+                questionTokenized = self.tokenize(question.lower())
+                if len(questionTokenized) > maxLenQuestion:
+                    maxLenQuestion = len(questionTokenized)
+                xQuestion.append(questionTokenized)
 
-            question = sample['query']
-            question = question.replace("''", '" ')
-            question = question.replace("``", '" ')
-            questionTokenized = self.tokenize(question.lower())
-            if len(questionTokenized) > maxLenQuestion:
-                maxLenQuestion = len(questionTokenized)
-            xQuestion.append(questionTokenized)
-
-        for i in range(len(xContext)):
-            for j in range(maxPassages - len(xContext[i])):
-                xContext[i].append([])
-                xSelected[i].append(0)
-
-        return xContext, xQuestion, xSelected, maxLenContext, maxLenQuestion, maxPassages
+        return xContext, xQuestion, xSelected, maxLenContext, maxLenQuestion
 
     def vectorizeData(self, xContext, xQuestion, word_index):
         '''Converts context and question words to their respective index and pad context to max context length
@@ -206,14 +187,12 @@ class Data:
         X = []
         Xq = []
         for i in range(len(xContext)):
-            x = []
-            for j in range(len(xContext[i])):
-                x.append([word_index[w] for w in xContext[i][j]])
+            x = [word_index[w] for w in xContext[i]]
             xq = [word_index[w] for w in xQuestion[i]]
             # map the first and last words of answer span to one-hot representations
             X.append(x)
             Xq.append(xq)
-        return [self.pad_sequences(x, self.max_context_size) for x in X], self.pad_sequences(Xq, self.max_ques_size)
+        return self.pad_sequences(X, self.max_context_size), self.pad_sequences(Xq, self.max_ques_size)
 
     def pad_sequences(self, X, maxlen):
         for context in X:
