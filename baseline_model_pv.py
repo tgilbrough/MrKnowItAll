@@ -34,8 +34,6 @@ class Model:
             for i in range(len(context)):
                 if i > 0:
                     scope.reuse_variables()
-                print(context[i].get_shape())
-                print(x_len.get_shape())
                 outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context[i], sequence_length=x_len, dtype=tf.float32)
                 context_fw, context_bw = outputs_context
                 context_output.append(tf.concat([context_fw, context_bw], axis=2))
@@ -75,7 +73,9 @@ class Model:
 
         # logits
         with tf.variable_scope('relevance'):
-            logits = tf.layers.dense(inputs=xq_output, units=10)
+            logits = tf.layers.dense(inputs=xq_output, units=1)
+
+        print(y.get_shape(), logits.get_shape())
 
         with tf.variable_scope('loss'):
             loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='loss')
