@@ -59,7 +59,7 @@ def main():
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
     # Place holder for just index of answer within context
-    y = tf.placeholder(tf.int32, [None], name='y_begin')
+    y = tf.placeholder(tf.int32, [None, data.max_passages], name='y')
 
     model.build(xs, x_len, q, q_len, y, data.embeddings, keep_prob)
 
@@ -82,21 +82,24 @@ def main():
         train_writer.add_graph(sess.graph)
         val_writer.add_graph(sess.graph)
 
-        sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer()) 
 
         for e in range(config.epochs):
             print('Epoch {}/{}'.format(e + 1, config.epochs))
             for i in tqdm(range(number_of_train_batches)):
                 trainBatch = data.getRandomTrainBatch()
 
-                print(trainBatch['tX'].shape)
+                feed_dict={
+                    x_len: [data.max_context_size] * len(trainBatch['tX'][0]),
+                    q: trainBatch['tXq'],
+                    q_len: [data.max_ques_size] * len(trainBatch['tX'][0]),
+                    y: trainBatch['tY'],
+                    keep_prob: config.keep_prob}
+                count = 0
+                for x in xs:
+                    feed_dict[x] = trainBatch['tX'][count]
+                    count += 1
 
-                feed_dict={xs: trainBatch['tX'],
-                            x_len: [[len(trainBatch['tX'][i][j]) for j in range(len(trainBatch['tX'][i]))] for i in range(len(trainBatch['tX']))],
-                            q: trainBatch['tXq'],
-                            q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
-                            y: trainBatch['tY'],
-                            keep_prob: config.keep_prob}
                 sess.run(train_step, feed_dict=feed_dict)
 
             # Record results for tensorboard, once per epoch

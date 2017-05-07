@@ -34,6 +34,8 @@ class Model:
             for i in range(len(context)):
                 if i > 0:
                     scope.reuse_variables()
+                print(context[i].get_shape())
+                print(x_len.get_shape())
                 outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context[i], sequence_length=x_len, dtype=tf.float32)
                 context_fw, context_bw = outputs_context
                 context_output.append(tf.concat([context_fw, context_bw], axis=2))
@@ -57,7 +59,7 @@ class Model:
             q_avg = tf.reduce_mean(q_temp, axis=1)
             q_avg_exp = tf.expand_dims(q_avg, axis=1)
             q_avg_tiled = tf.tile(q_avg_exp, [1, self.max_x, 1])
-            tf.summary.histogram('q_avg_tiled', q_avg_tiled)
+            tf.summary.histogram('q_avg_tiled', q_avg)
 
         xq = tf.concat([context_output, q_avg_tiled], axis=2)
         tf.summary.histogram('xq', xq)
@@ -71,16 +73,9 @@ class Model:
             xq_output = tf.concat([xq_fw, xq_bw], axis=2)
             tf.summary.histogram('xq_output', xq_output)
 
-        # Get rid of the sequence dimension
-        xq_flat = tf.reshape(xq_output, [-1, 2 * self.dim])
-
-        # tensor of boolean values of max_x length and True in first x_len indices
-        x_mask = tf.sequence_mask(x_len, self.max_x)
-
         # logits
         with tf.variable_scope('relevance'):
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=10), [-1, self.max_x])
-            logits = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
+            logits = tf.layers.dense(inputs=xq_output, units=10)
 
         with tf.variable_scope('loss'):
             loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=logits), name='loss')

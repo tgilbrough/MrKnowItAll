@@ -76,6 +76,8 @@ class Data:
         tXq_batch = self.tXq[points]
         tY_batch = self.tY[points]
 
+        tX_batch = np.transpose(tX_batch, axes=(1, 0, 2))
+
         return {'tX': tX_batch, 'tXq': tXq_batch, 'tY': tY_batch}
 
     def getRandomValBatch(self):
@@ -193,7 +195,7 @@ class Data:
         for i in range(len(xContext)):
             for j in range(maxPassages - len(xContext[i])):
                 xContext[i].append([])
-                xSelected.append(0)
+                xSelected[i].append(0)
 
         return xContext, xQuestion, xSelected, maxLenContext, maxLenQuestion, maxPassages
 
