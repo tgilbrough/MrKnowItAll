@@ -148,8 +148,8 @@ def main():
                     keep_prob: 1.0}
             selected_pred = sess.run([prediction], feed_dict=feed_dict)
 
-            for j in range(len(y)):
-                print(y[j], selected_pred[j])
+            for j in range(len(valBatch['vY'])):
+                print(valBatch['vY'][j], selected_pred[0][j])
 
 if __name__ == "__main__":
     main()
