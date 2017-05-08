@@ -82,7 +82,7 @@ class Model:
         alpha = tf.layers.dense(U, 1, name='alpha')
         alpha = tf.reshape(alpha, [-1, self.max_x + 1])
         beta = tf.layers.dense(U, 1, name='beta')
-        beta = tf.reshape(beta, [-1, self.max_x + 1])S
+        beta = tf.reshape(beta, [-1, self.max_x + 1])
 
         with tf.variable_scope('loss'):
             loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=alpha), name='beginning_loss')

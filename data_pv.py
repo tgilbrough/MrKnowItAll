@@ -200,6 +200,29 @@ class Data:
                 context.append(0)
         return X
 
+    def saveAnswersForEval(self, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
+        ref_fn = './references/' + questionType + '.json'
+        
+        rf = open(ref_fn, 'w', encoding='utf-8')
+
+        for i in range(len(vContext)):
+            predictedAnswer = ' '.join(vContext[i][predictedBegin[i] : predictedEnd[i] + 1])
+            trueAnswer = ' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
+
+            reference = {}
+            candidate = {}
+            reference['query_id'] = vQuestionID[i]
+            reference['answers'] = [trueAnswer]
+
+            candidate['query_id'] = vQuestionID[i]
+            candidate['answers'] = [predictedAnswer]
+
+            print(json.dumps(reference, ensure_ascii=False), file=rf)
+            print(json.dumps(candidate, ensure_ascii=False), file=cf)
+
+        rf.close()
+        cf.close()
+
     def importMsmarco(self, json_file):
         data = {}
         data['data'] = []

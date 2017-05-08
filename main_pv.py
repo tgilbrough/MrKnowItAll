@@ -127,11 +127,6 @@ def main():
         new_saver.restore(sess, tf.train.latest_checkpoint(save_model_path))
 
         # Print out answers for one of the batches
-        vContext = []
-        vQuestionID = []
-        predictedBegin = []
-        predictedEnd = []
-
         total = 0
 
         for i in range(number_of_val_batches):
@@ -145,10 +140,7 @@ def main():
                     q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vX']))],
                     y: valBatch['vY'],
                     keep_prob: 1.0}
-            selected_pred = sess.run([prediction], feed_dict=feed_dict)
-
-            for j in range(len(y)):
-                print(y[j], selected_pred[j])
+            selected_pred = sess.run([prediction], feed_dict=feed_dict)        
 
 if __name__ == "__main__":
     main()

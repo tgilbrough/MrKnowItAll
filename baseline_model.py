@@ -71,6 +71,7 @@ class Model:
 
         # logits
         with tf.variable_scope('start_index'):
+            print(tf.layers.dense(inputs=xq_flat, units=1).get_shape())
             val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])
             logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_start = tf.argmax(logits_start, axis=1, name='starting_index')
