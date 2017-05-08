@@ -163,7 +163,7 @@ def main():
                         tp += 1
 
         print('Precision:', tp / (tp + fp))
-        print('Recall:', tp / (tp + fp))
+        print('Recall:', tp / (tp + fn))
         print('F1:', (2 * tp) / ((2 * tp) + fp + fn))
 
 if __name__ == "__main__":
