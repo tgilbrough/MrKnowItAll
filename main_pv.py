@@ -134,6 +134,7 @@ def main():
 
         total = 0
 
+        tp, tn, fp, fn = 0, 0, 0, 0
 
         for i in range(number_of_val_batches):
             valBatch = data.getValBatch()
@@ -150,6 +151,20 @@ def main():
 
             for j in range(len(valBatch['vY'])):
                 print(valBatch['vY'][j], selected_pred[0][j])
+                if valBatch['vY'][j] == 0:
+                    if selected_pred[0][j] == 0:
+                        tn += 1
+                    else:
+                        fp += 1
+                else:
+                    if selected_pred[0][j] == 0:
+                        fn += 1
+                    else:
+                        tp += 1
+
+        print('Precision:', tp / (tp + fp))
+        print('Recall:', tp / (tp + fp))
+        print('F1:', (2 * tp) / ((2 * tp) + fp + fn))
 
 if __name__ == "__main__":
     main()
