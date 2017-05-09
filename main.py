@@ -7,6 +7,7 @@ import baseline_model
 import attention_model
 import coattention_model
 import linked_outputs
+import bidaf
 
 from data import Data
 
@@ -22,10 +23,11 @@ def get_parser():
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
-                        choices=['baseline', 'attention', 'coattention', 'linked_outputs'])
+                        choices=['baseline', 'attention', 'coattention', 'linked_outputs', 'bidaf'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--pool_size', '-ps', type=int, default=16)
     parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
+    parser.add_argument('--cell', '-c', default='gru')
 
     return parser
 
@@ -52,6 +54,8 @@ def main():
         print("Using coattention model")
     elif config.model == 'linked_outputs':
         model = linked_outputs.Model(config, data.max_context_size, data.max_ques_size)
+    elif config.model == 'bidaf':
+        model = bidaf.Model(config, data.max_context_size, data.max_ques_size)
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
@@ -77,7 +81,7 @@ def main():
 
     print('Computation graph completed.')
 
-    train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(model.loss)
+    train_step = tf.train.AdadeltaOptimizer(config.learning_rate).minimize(model.loss)
 
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
