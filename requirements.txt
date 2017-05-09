@@ -26,3 +26,5 @@ toolz==0.8.2
 tqdm==4.11.2
 ujson==1.35
 wrapt==1.10.10
+scikit-learn==0.18.1
+sklearn==0.0
