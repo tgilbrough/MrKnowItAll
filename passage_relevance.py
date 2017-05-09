@@ -1,5 +1,4 @@
 import json
-import pandas as pd
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
@@ -31,7 +30,7 @@ def load_passages(path):
 
     return samples
 
-train = load_passages('datasets/msmarco/train/person.json')
+train = load_passages('datasets/msmarco/train/location.json')
 for t in train[:10]:
     tfidf = TfidfVectorizer().fit_transform([t['query']] + t['passages'])
     cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
