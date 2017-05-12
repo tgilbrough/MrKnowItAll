@@ -17,8 +17,8 @@ class Model:
         """
         d: dim
         N: batch_size
-        MX: max_x
-        MQ: max_q
+        T: max_x
+        J: max_q
         V: vocab_size
         """
         with tf.variable_scope('embedding_matrix'):
@@ -27,12 +27,10 @@ class Model:
             tf.summary.histogram('emb_mat', emb_mat)
         
         with tf.variable_scope('embedding_context'):
-            # [N, MX, d]
-            context = tf.nn.embedding_lookup(emb_mat, x, name='context')
+            context = tf.nn.embedding_lookup(emb_mat, x, name='context') # X \in [N, T, d]
 
         with tf.variable_scope('embedding_question'):
-            # [N, MQ, d]
-            question = tf.nn.embedding_lookup(emb_mat, q, name='question')
+            question = tf.nn.embedding_lookup(emb_mat, q, name='question') # Q \in [N, J, d]
 
         with tf.variable_scope('encoding_context'):
             if self.cell == 'gru':
@@ -43,7 +41,7 @@ class Model:
 
             outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell_x, cell_x, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
-            context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
+            context_output = tf.concat([context_fw, context_bw], axis=2)  # H \in [N, T, 2d]
             tf.summary.histogram('context_output', context_output)
 
         with tf.variable_scope('encoding_question'):
@@ -56,24 +54,29 @@ class Model:
 
             outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(cell_q, cell_q, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
-            question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
+            question_output = tf.concat([question_fw, question_bw], axis=2)   # U \in [N, J, 2d]
             tf.summary.histogram('question_output', question_output)
 
         q_mask = tf.sequence_mask(q_len, self.max_q)
         x_mask = tf.sequence_mask(x_len, self.max_x)
 
-        with tf.variable_scope('contex_to_query_attention'):
-            x_exp = tf.tile(tf.expand_dims(context_output, axis=2), [1, 1, self.max_q, 1])  # [N, MX, MQ, 2d]
-            q_exp = tf.tile(tf.expand_dims(question_output, axis=1), [1, self.max_x, 1, 1])  # [N, MX, MQ, 2d]
-            inputs = tf.concat([x_exp, q_exp, x_exp * q_exp], 3)  # [N, MX, MQ, 6d]
-            mask = tf.tile(tf.expand_dims(x_mask, -1), [1, 1, self.max_q]) & tf.expand_dims(q_mask, 1)  # [N, MX, MQ]
+        with tf.variable_scope('shared_similarity_matrix'):
+            x_exp = tf.tile(tf.expand_dims(context_output, axis=2), [1, 1, self.max_q, 1])  # [N, T, J, 2d]
+            q_exp = tf.tile(tf.expand_dims(question_output, axis=1), [1, self.max_x, 1, 1])  # [N, T, J, 2d]
+            inputs = tf.concat([x_exp, q_exp, x_exp * q_exp], 3)  # [N, T, J, 6d]
+            mask = tf.tile(tf.expand_dims(x_mask, -1), [1, 1, self.max_q]) & tf.expand_dims(q_mask, 1)  # [N, T, J]
             val = tf.reshape(tf.layers.dense(inputs=inputs, units=1), [-1, self.max_x, self.max_q])
-            logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10  # [N, MX, MQ]
+            logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10  # S \in [N, T, J]
+            
+        with tf.variable_scope('context_to_query_attention'):
             probs = tf.nn.softmax(logits)
-            sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2)
+            sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2) # U^{tilde} \in [N, T, 2d]
             tf.summary.histogram('sum_q', sum_q)
 
-        xq = tf.concat([context_output, sum_q, context_output * sum_q], axis=2)  # [N, MX, 6d]
+        with tf.variable_scope('query_to_context_attention'):
+            pass
+
+        xq = tf.concat([context_output, sum_q, context_output * sum_q], axis=2)  # G \in [N, T, 6d]
 
         with tf.variable_scope('post_process_1'):
             if self.cell == 'gru':
@@ -83,7 +86,7 @@ class Model:
             cell_xq_1 = DropoutWrapper(cell_xq_1, input_keep_prob=keep_prob)  # to avoid over-fitting
             outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_1, cell_xq_1, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw_1, xq_bw_1 = outputs_xq_1
-            xq_output_1 = tf.concat([xq_fw_1, xq_bw_1], axis=2)  # [N, MX, 2d]
+            xq_output_1 = tf.concat([xq_fw_1, xq_bw_1], axis=2)  # M \in [N, T, 2d]
 
         with tf.variable_scope('post_process_2'):
             if self.cell == 'gru':
@@ -93,15 +96,15 @@ class Model:
             cell_xq_2 = DropoutWrapper(cell_xq_2, input_keep_prob=keep_prob)  # to avoid over-fitting
             outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_2, cell_xq_2, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
             xq_fw_2, xq_bw_2 = outputs_xq_2
-            xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
+            xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # M \in [N, T, 2d]
             tf.summary.histogram('xq_output', xq_output_2)
 
         # Get rid of the sequence dimension
-        xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * MX, 2d]
+        xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * T, 2d]
 
         # logits
         with tf.variable_scope('start_index'):
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, MX]
+            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, T]
             logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_start = tf.argmax(logits_start, axis=1, name='starting_index')  # [N]
             tf.summary.histogram('yp_start', yp_start)
@@ -115,9 +118,9 @@ class Model:
 
             outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_end, cell_xq_end, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw_end, xq_bw_end = outputs_xq_end
-            xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
-            xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
+            xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # M^2 \in [N, T, 2d]
+            xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * T, 2d]
+            val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, T]
             logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
             tf.summary.histogram('yp_end', yp_end)
