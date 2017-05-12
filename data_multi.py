@@ -8,7 +8,6 @@ import tensorflow as tf
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
-from nltk.metrics.distance import jaccard_distance
 
 class Data:
     def __init__(self, config):
