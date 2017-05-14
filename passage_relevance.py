@@ -3,6 +3,9 @@ import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 
+from matplotlib import pyplot as plt
+
+
 def load_samples(path):
     with open(path, encoding='utf-8') as f:
         for line in f:
@@ -30,20 +33,55 @@ def load_passages(path):
 
     return samples
 
-train = load_passages('datasets/msmarco/train/person.json')
-
-
-for t in train[:10]:
+def get_rank(t):
     tfidf = TfidfVectorizer().fit_transform([t['query']] + t['passages'])
     cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
     related_docs_indices = cosine_similarities.argsort()[::-1]
+    try:
+        selected_index = t['selected'].index(1)
+        return related_docs_indices.tolist().index(selected_index)
+    except ValueError:
+        return None
 
-    print('Cosine Similarities:', cosine_similarities)
-    print('Ranked indexes:', related_docs_indices)
-    print('Selected:', t['selected'])
-    print('Query:', t['query'] + '?')
-    print()
-    print('Passages:')
-    for i in range(len(t['passages'])):
-        print(i, ':', t['passages'][i])
+
+def get_accuracy(passages):
+    rank_counter = collections.Counter(get_rank(t) for t in passages)
+    counts = [count for element, count in rank_counter.items()
+              if element is not None]
+    cumsum = np.cumsum(counts)
+    percents = [x / cumsum[-1] for x in cumsum]
+    return percents
+
+
+def main():
+    for question_type in ['entity', 'location', 'description', 'numeric', 'person']:
+        path = 'datasets/msmarco/train/{}.json'.format(question_type)
+        passages = load_passages(path)
+        accuracy = get_accuracy(passages)
+        plt.plot(accuracy, label=question_type)
+
+    plt.ylabel('Percent of Questions where Selected Passage is Included')
+    plt.xlabel('Number of Passages')
+    plt.legend()
+    plt.show()
+
+main()
+
+
+def a():
+    train = load_passages('datasets/msmarco/train/location.json')
+
+    for t in train[:0]:
+        tfidf = TfidfVectorizer().fit_transform([t['query']] + t['passages'])
+        cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
+        related_docs_indices = cosine_similarities.argsort()[::-1]
+
+        print('Cosine Similarities:', cosine_similarities)
+        print('Ranked indexes:', related_docs_indices)
+        print('Selected:', t['selected'])
+        print('Query:', t['query'] + '?')
         print()
+        print('Passages:')
+        for i in range(len(t['passages'])):
+            print(i, ':', t['passages'][i])
+            print()
