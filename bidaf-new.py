@@ -42,32 +42,27 @@ class Model:
                 layers = 2
                 carry_bias = -1.0
                 context = self.highway_network(context, layers, carry_bias)
+                tf.get_variable_scope().reuse_variables()
                 question = self.highway_network(question, layers, carry_bias)
 
-        with tf.variable_scope('encoding_context'):
-            if self.cell == 'gru':
-                cell_x = GRUCell(self.dim)
-            else:
-                cell_x = LSTMCell(self.dim)
-            cell_x = DropoutWrapper(cell_x, input_keep_prob=keep_prob)  # to avoid over-fitting
+        if self.cell == 'gru':
+            cell = GRUCell(self.dim)
+        else:
+            cell = LSTMCell(self.dim)
+        d_cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell_x, cell_x, inputs=context, sequence_length=x_len, dtype=tf.float32)
-            context_fw, context_bw = outputs_context
-            context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
-            #tf.summary.histogram('context_output', context_output)
-
-        with tf.variable_scope('encoding_question'):
-            #tf.get_variable_scope().reuse_variables()
-            if self.cell == 'gru':
-                cell_q = GRUCell(self.dim)
-            else:
-                cell_q = LSTMCell(self.dim)
-            cell_q = DropoutWrapper(cell_q, input_keep_prob=keep_prob)  # to avoid over-fitting
-
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(cell_q, cell_q, inputs=question, sequence_length=q_len, dtype=tf.float32)
+        with tf.variable_scope('encoding'):
+            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(cell_q, cell_q, inputs=question, sequence_length=q_len, dtype=tf.float32, scope='u1')
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
             #tf.summary.histogram('question_output', question_output)
+
+            tf.get_variable_scope().reuse_variables()
+
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
+            context_fw, context_bw = outputs_context
+            context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
+            #tf.summary.histogram('context_output', context_output)
 
         q_mask = tf.sequence_mask(q_len, self.max_q)
         x_mask = tf.sequence_mask(x_len, self.max_x)
@@ -97,22 +92,22 @@ class Model:
             xq = tf.concat([context_output, sum_q, context_output * sum_q], axis=2)  # [N, MX, 6d]
 
         with tf.variable_scope('post_process_1'):
-            if self.cell == 'gru':
-                cell_xq_1 = GRUCell(self.dim)
-            else:
-                cell_xq_1 = LSTMCell(self.dim)
-            cell_xq_1 = DropoutWrapper(cell_xq_1, input_keep_prob=keep_prob)  # to avoid over-fitting
-            outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_1, cell_xq_1, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+            # if self.cell == 'gru':
+            #     cell_xq_1 = GRUCell(self.dim)
+            # else:
+            #     cell_xq_1 = LSTMCell(self.dim)
+            # cell_xq_1 = DropoutWrapper(cell_xq_1, input_keep_prob=keep_prob)  # to avoid over-fitting
+            outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw_1, xq_bw_1 = outputs_xq_1
             xq_output_1 = tf.concat([xq_fw_1, xq_bw_1], axis=2)  # [N, MX, 2d]
 
         with tf.variable_scope('post_process_2'):
-            if self.cell == 'gru':
-                cell_xq_2 = GRUCell(self.dim)
-            else:
-                cell_xq_2 = LSTMCell(self.dim)
-            cell_xq_2 = DropoutWrapper(cell_xq_2, input_keep_prob=keep_prob)  # to avoid over-fitting
-            outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_2, cell_xq_2, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
+            # if self.cell == 'gru':
+            #     cell_xq_2 = GRUCell(self.dim)
+            # else:
+            #     cell_xq_2 = LSTMCell(self.dim)
+            # cell_xq_2 = DropoutWrapper(cell_xq_2, input_keep_prob=keep_prob)  # to avoid over-fitting
+            outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
             xq_fw_2, xq_bw_2 = outputs_xq_2
             xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('xq_output', xq_output_2)
@@ -128,13 +123,13 @@ class Model:
             #tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
-            if self.cell == 'gru':
-                cell_xq_end = GRUCell(self.dim)
-            else:
-                cell_xq_end = LSTMCell(self.dim)
-            cell_xq_end = DropoutWrapper(cell_xq_end, input_keep_prob=keep_prob)  # to avoid over-fitting
+        #     if self.cell == 'gru':
+        #         cell_xq_end = GRUCell(self.dim)
+        #     else:
+        #         cell_xq_end = LSTMCell(self.dim)
+        #     cell_xq_end = DropoutWrapper(cell_xq_end, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(cell_xq_end, cell_xq_end, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw_end, xq_bw_end = outputs_xq_end
             xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
             xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]

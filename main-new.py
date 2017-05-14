@@ -7,7 +7,7 @@ import baseline_model
 import attention_model
 import coattention_model
 import linked_outputs
-import bidaf
+import bidaf-new
 
 from data import Data
 
@@ -27,7 +27,7 @@ def get_parser():
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--pool_size', '-ps', type=int, default=16)
     parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
-    parser.add_argument('--cell', '-c', default='gru')
+    parser.add_argument('--cell', '-c', default='lstm')
     parser.add_argument('--highway_network', '-hwn', type=int, default=1)
     parser.add_argument('--q2c_attention', '-q2c', type=int, default=1)
 
