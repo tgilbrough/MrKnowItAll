@@ -21,27 +21,29 @@ class Data:
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
         self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
-            self.maxLenTContext, self.maxLenTQuestion, self.maxTPassages = self.splitMsmarcoDatasets(trainData)
+            self.maxLenTContext, self.maxLenTQuestion, tPassageLengths = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
         self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
-            self.maxLenVContext, self.maxLenVQuestion, self.maxVPassages = self.splitMsmarcoDatasets(valData)
+            self.maxLenVContext, self.maxLenVQuestion, vPassageLengths = self.splitMsmarcoDatasets(valData)
 
         self.tPassRel = self.passageRevelevance(self.tContext, self.tQuestion)
         self.vPassRel = self.passageRevelevance(self.vContext, self.vQuestion)
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
-        vocab = self.buildVocab([t for p in self.tContext for t in p] + self.tQuestion + [t for p in self.vContext for t in p] + self.vQuestion)
+        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
         self.vocab_size = len(vocab) + 1
         word_index = dict((c, i + 1) for i, c in enumerate(vocab))
         self.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
         self.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
-        self.max_passages = max(self.maxTPassages, self.maxVPassages)
+
+        self.tPassWeights = self.passageWeight(self.tPassRel, tPassageLengths, self.max_context_size)
+        self.vPassWeights = self.passageWeight(self.vPassRel, vPassageLengths, self.max_context_size)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
@@ -70,13 +72,16 @@ class Data:
         self.tYBegin = np.array(self.tYBegin)
         self.tYEnd = np.array(self.tYEnd)
         self.tPassRel = np.array(self.tPassRel)
+        self.tPassWeights = np.array(self.tPassWeights)
         self.vX = np.array(self.vX)
         self.vXq = np.array(self.vXq)
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
         self.vPassRel = np.array(self.vPassRel)
+        self.vPassWeights = np.array(self.vPassWeights)
         self.vContext = np.array(self.vContext, dtype=object)
         self.vQuestionID = np.array(self.vQuestionID, dtype=object)
+        
 
     def getNumTrainBatches(self):
         return int(math.ceil(len(self.tX) / self.batch_size))
@@ -91,9 +96,11 @@ class Data:
         tXq_batch = self.tXq[points]
         tYBegin_batch = self.tYBegin[points]
         tYEnd_batch = self.tYEnd[points]
+        tPassWeights_batch = self.tPassWeights[points]
 
         return {'tX': tX_batch, 'tXq': tXq_batch,
-                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
+                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch, 
+                'tXPassWeights': tPassWeights_batch}
 
     def getRandomValBatch(self):
         points = np.random.choice(len(self.vX), self.batch_size)
@@ -102,9 +109,11 @@ class Data:
         vXq_batch = self.vXq[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
+        vPassWeights_batch = self.vPassWeights[points]
 
         return {'vX': vX_batch, 'vXq': vXq_batch,
-                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
+                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch,
+                'vXPassWeights': vPassWeights_batch}
 
     def getValBatch(self):
         start = self.valBatchNum * self.batch_size
@@ -117,6 +126,7 @@ class Data:
         vXq_batch = self.vXq[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
+        vPassWeights_batch = self.vPassWeights[points]
 
         self.valBatchNum += 1
 
@@ -125,7 +135,8 @@ class Data:
 
         return {'vContext': vContext_batch, 'vQuestionID': vQuestionID_batch,
                 'vX': vX_batch, 'vXq': vXq_batch,
-                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
+                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch, 
+                'vXPassWeights': vPassWeights_batch}
 
     def loadGloveModel(self, gloveFile):
         print("Loading Glove Model...")
@@ -179,31 +190,29 @@ class Data:
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
            and keep track of max context and question lengths.
         '''
-        xContext = [] # list of list of contexts paragraphs
+        xContext = [] # list of contexts paragraphs
         xQuestion = [] # list of questions
         xQuestion_id = [] # list of question id
         xAnswerBegin = [] # list of indices of the beginning word in each answer span
         xAnswerEnd = [] # list of indices of the ending word in each answer span
         xAnswerText = [] # list of the answer text
+        xPassageLengths = [] # list of the passage lengths
         maxLenContext = 0
         maxLenQuestion = 0
-        maxPassages = 0
 
         # For now only pick out selected passages that have answers directly inside the passage
-        for data in f['data']:
+        for data in f['data'][:100]:
             passages = []
+            passage_lengths = []
             for passage in data['passages']:
                 context = passage['passage_text']
                 contextTokenized = self.tokenize(context.lower())
-                passages.append(contextTokenized)
+                passage_lengths.append(len(contextTokenized))
+                passages += contextTokenized
 
-            contextLength = sum(len(p) for p in passages)
+            contextLength = len(passages)
             if contextLength > maxLenContext:
                 maxLenContext = contextLength
-
-            numPassages = len(passages)
-            if numPassages > maxPassages:
-                maxPassages = numPassages
 
             question = data['query']
             questionTokenized = self.tokenize(question.lower())
@@ -214,7 +223,7 @@ class Data:
 
             for answer in data['answers']:
                 answerTokenized = self.tokenize(answer.lower())
-                answerBeginIndex, answerEndIndex = self.findAnswer([t for p in passages for t in p], answerTokenized)
+                answerBeginIndex, answerEndIndex = self.findAnswer(passages, answerTokenized)
                 if answerBeginIndex != -1:
                     xContext.append(passages)
                     xQuestion.append(questionTokenized)
@@ -222,9 +231,10 @@ class Data:
                     xAnswerBegin.append(answerBeginIndex)
                     xAnswerEnd.append(answerEndIndex)
                     xAnswerText.append(answer)
+                    xPassageLengths.append(passage_lengths)
                     break
 
-        return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, maxPassages
+        return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, xPassageLengths
 
     def findAnswer(self, contextTokenized, answerTokenized):
         contextLen = len(contextTokenized)
@@ -244,29 +254,21 @@ class Data:
         YBegin = []
         YEnd = []
         for i in range(len(xContext)):
-            xs = []
-            for p in xContext[i]:
-                xs.append([word_index[w] for w in p])
-
+            x = [word_index[w] for w in xContext[i]]
             xq = [word_index[w] for w in xQuestion[i]]
             # map the first and last words of answer span to one-hot representations
             y_Begin =  xAnswerBegin[i]
             y_End = xAnswerEnd[i] - 1
-            X.append(xs)
+            X.append(x)
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
-        return self.pad_sequences(X, self.max_context_size, self.max_passages), self.pad_sequences(Xq, self.max_ques_size), YBegin, YEnd
+        return self.pad_sequences(X, self.max_context_size), self.pad_sequences(Xq, self.max_ques_size), YBegin, YEnd
 
-    def pad_sequences(self, X, maxlen, maxPass=None):
-        if maxPass is None:
-            for context in X:
-                for i in range(maxlen - len(context)):
-                    context.append(0)
-        else:
-            for context in X:
-                for i in range(maxlen - sum(len(c) for c in context)):
-                    context[-1].append(0)
+    def pad_sequences(self, X, maxlen):
+        for context in X:
+            for i in range(maxlen - len(context)):
+                context.append(0)
         return X
 
     def passageRevelevance(self, xContext, xQuestion):
@@ -274,10 +276,29 @@ class Data:
         for i in range(len(xContext)):
             tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + [' '.join(c) for c in xContext[i]])
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
-
+            
+            # Apply softmax
+            cosine_similarities = [math.exp(x) for x in cosine_similarities]
+            sum_cs = sum(cosine_similarities)
+            cosine_similarities = [x / sum_cs for x in cosine_similarities]
+            
             cs.append(cosine_similarities)
-
+        
         return cs
+
+    def passageWeight(self, passRel, passLen, max_len):
+        ret = []
+        for i in range(len(passLen)):
+            passWeight = []
+            for r, l in zip(passRel[i], passLen[i]):
+                for _ in range(l):
+                    passWeight.append(r)
+
+            for i in range(max_len - len(passWeight)):
+                passWeight.append(0.0)
+
+            ret.append(passWeight)
+        return ret
 
     def saveAnswersForEval(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         ref_fn = './references/' + questionType + '.json'
