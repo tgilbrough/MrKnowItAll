@@ -52,14 +52,14 @@ class Model:
         d_cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
         with tf.variable_scope('encoding'):
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32, scope='u1')
+            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
             #tf.summary.histogram('question_output', question_output)
 
             tf.get_variable_scope().reuse_variables()
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('context_output', context_output)
@@ -113,8 +113,10 @@ class Model:
             #tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
-            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+            inputs = tf.concat([xq, xq_output_2, tf.tile(tf.expand_dims(logits_start, 1), [1, self.max_x, 1])], axis=2)
+            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
             xq_fw_end, xq_bw_end = outputs_xq_end
+            
             xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
             xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
             val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
