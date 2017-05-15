@@ -59,7 +59,7 @@ class Model:
 
             tf.get_variable_scope().reuse_variables()
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('context_output', context_output)
@@ -102,20 +102,20 @@ class Model:
             xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('xq_output', xq_output_2)
 
-        # Get rid of the sequence dimension
-        xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * MX, 2d]
-
-        # logits
         with tf.variable_scope('start_index'):
+            # Get rid of the sequence dimension
+            xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * MX, 2d]
+
             val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, MX]
             logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_start = tf.argmax(logits_start, axis=1, name='starting_index')  # [N]
             #tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
-            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq_output_2, sequence_length=x_len, dtype=tf.float32)
             xq_fw_end, xq_bw_end = outputs_xq_end
             xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
+
             xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
             val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
             logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
