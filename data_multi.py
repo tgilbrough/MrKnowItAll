@@ -29,8 +29,8 @@ class Data:
         self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
             self.maxLenVContext, self.maxLenVQuestion, vPassageLengths = self.splitMsmarcoDatasets(valData)
 
-        self.tPassRel = self.passageRevelevance(self.tContext, self.tQuestion)
-        self.vPassRel = self.passageRevelevance(self.vContext, self.vQuestion)
+        self.tPassRel = self.passageRevelevance(self.tContext, self.tQuestion, tPassageLengths)
+        self.vPassRel = self.passageRevelevance(self.vContext, self.vQuestion, vPassageLengths)
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
@@ -201,7 +201,7 @@ class Data:
         maxLenQuestion = 0
 
         # For now only pick out selected passages that have answers directly inside the passage
-        for data in f['data'][:100]:
+        for data in f['data']:
             passages = []
             passage_lengths = []
             for passage in data['passages']:
@@ -271,10 +271,16 @@ class Data:
                 context.append(0)
         return X
 
-    def passageRevelevance(self, xContext, xQuestion):
+    def passageRevelevance(self, xContext, xQuestion, xPassageLengths):
         cs = []
         for i in range(len(xContext)):
-            tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + [' '.join(c) for c in xContext[i]])
+            passages = []
+            prev_end = 0
+            for j in xPassageLengths[i]:
+                passages.append(' '.join(xContext[i][prev_end : prev_end + j]))
+                prev_end += j
+
+            tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
             
             # Apply softmax
