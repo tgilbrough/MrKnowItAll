@@ -37,13 +37,13 @@ class Model:
             # [N, MQ, d]
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
-        # with tf.variable_scope('highway_network'):
-        #     if self.highway_network_use:
-        #         layers = 2
-        #         carry_bias = -1.0
-        #         context = self.highway_network(context, layers, carry_bias)
-        #         tf.get_variable_scope().reuse_variables()
-        #         question = self.highway_network(question, layers, carry_bias)
+        with tf.variable_scope('highway_network'):
+            if self.highway_network_use:
+                layers = 2
+                carry_bias = -1.0
+                context = self.highway_network(context, layers, carry_bias)
+                tf.get_variable_scope().reuse_variables()
+                question = self.highway_network(question, layers, carry_bias)
 
         if self.cell == 'gru':
             cell = GRUCell(self.dim)
@@ -154,21 +154,45 @@ class Model:
         return curr
 
     def highway_layer(self, x, carry_bias):
-        W = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
-        b = tf.Variable(tf.constant(0.1, shape=[self.dim]))
+        # W = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
+        # b = tf.Variable(tf.constant(0.1, shape=[self.dim]))
 
-        W = tf.tile(tf.expand_dims(W, 0), [self.batch_size, 1, 1])
-        #b = tf.tile(tf.expand_dims(b, 0), [self.batch_size, 1])
+        # W = tf.tile(tf.expand_dims(W, 0), [self.batch_size, 1, 1])
+        # #b = tf.tile(tf.expand_dims(b, 0), [self.batch_size, 1])
 
-        W_T = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
-        b_T = tf.Variable(tf.constant(carry_bias, shape=[self.dim]))
+        # W_T = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
+        # b_T = tf.Variable(tf.constant(carry_bias, shape=[self.dim]))
 
-        W_T = tf.tile(tf.expand_dims(W_T, 0), [self.batch_size, 1, 1])
-        #b_T = tf.tile(tf.expand_dims(b_T, 0), [self.batch_size, 1])
+        # W_T = tf.tile(tf.expand_dims(W_T, 0), [self.batch_size, 1, 1])
+        # #b_T = tf.tile(tf.expand_dims(b_T, 0), [self.batch_size, 1])
 
-        H = tf.nn.relu(tf.matmul(x, W) + b)
-        T = tf.sigmoid(tf.matmul(x, W_T) + b_T)
-        C = tf.subtract(1.0, T)
+        # H = tf.nn.relu(tf.matmul(x, W) + b)
+        # T = tf.sigmoid(tf.matmul(x, W_T) + b_T)
+        # C = tf.subtract(1.0, T)
 
-        y = tf.multiply(H, T) + tf.multiply(x, C)
+        # y = tf.multiply(H, T) + tf.multiply(x, C)
+
+        W_T = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1), name="weight_transform")
+        b_T = tf.Variable(tf.constant(carry_bias, shape=[self.dim]), name="bias_transform")
+
+        W = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1), name="weight")
+        b = tf.Variable(tf.constant(0.1, shape=[self.dim]), name="bias")
+
+        H = tf.nn.softmax(self.batch_matmul(x, W) + b, name="activation")
+        T = tf.sigmoid(self.batch_matmul(x, W_T) + b_T, name="transform_gate")
+        C = tf.subtract(1.0, T, name="carry_gate")
+
+        y = tf.add(tf.multiply(H, T), tf.multiply(x, C), "y")
+        return y
+
+    def batch_matmul(self, x, W):
+        shape = x.get_shape()
+        m = shape[1].value
+        n = shape[2].value
+
+        c = W.get_shape()[0].value
+
+        x = tf.reshape(x, [-1, n])
+        y = tf.matmul(x, W)
+        y = tf.reshape(y, [-1, m, c])
         return y
