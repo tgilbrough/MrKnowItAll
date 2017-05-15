@@ -102,45 +102,45 @@ def main():
 
         sess.run(tf.global_variables_initializer())
 
-#        for e in range(config.epochs):
-#            print('Epoch {}/{}'.format(e + 1, config.epochs))
-#            for i in tqdm(range(number_of_train_batches)):
-#                trainBatch = data.getRandomTrainBatch()
+        for e in range(config.epochs):
+            print('Epoch {}/{}'.format(e + 1, config.epochs))
+            for i in tqdm(range(number_of_train_batches)):
+                trainBatch = data.getRandomTrainBatch()
 
-#                feed_dict={x: trainBatch['tX'],
-#                            x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
-#                            q: trainBatch['tXq'],
-#                            q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
-#                            y_begin: trainBatch['tYBegin'],
-#                            y_end: trainBatch['tYEnd'],
-#                            keep_prob: config.keep_prob}
-#                sess.run(train_step, feed_dict=feed_dict)
+                feed_dict={x: trainBatch['tX'],
+                            x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                            q: trainBatch['tXq'],
+                            q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
+                            y_begin: trainBatch['tYBegin'],
+                            y_end: trainBatch['tYEnd'],
+                            keep_prob: config.keep_prob}
+                sess.run(train_step, feed_dict=feed_dict)
 
             # Record results for tensorboard, once per epoch
- #           feed_dict={x: trainBatch['tX'],
- #                   x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
- #                   q: trainBatch['tXq'],
- #                   q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
- #                   y_begin: trainBatch['tYBegin'],
- #                   y_end: trainBatch['tYEnd'],
- #                   keep_prob: 1.0}
- #           train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
+            feed_dict={x: trainBatch['tX'],
+                    x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                    q: trainBatch['tXq'],
+                    q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
+                    y_begin: trainBatch['tYBegin'],
+                    y_end: trainBatch['tYEnd'],
+                    keep_prob: 1.0}
+            train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
 
-#            valBatch = data.getRandomValBatch()
-#            feed_dict={x: valBatch['vX'],
-#                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
-#                    q: valBatch['vXq'],
-#                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
-#                    y_begin: valBatch['vYBegin'],
-#                    y_end: valBatch['vYEnd'],
-#                    keep_prob: 1.0}
-#            val_sum, val_loss  = sess.run([model.merged_summary, model.loss], feed_dict=feed_dict)
-#            if val_loss < min_val_loss:
-#                saver.save(sess, save_model_path + '/model')
-#                min_val_loss = val_loss
+            valBatch = data.getRandomValBatch()
+            feed_dict={x: valBatch['vX'],
+                    x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
+                    q: valBatch['vXq'],
+                    q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
+                    y_begin: valBatch['vYBegin'],
+                    y_end: valBatch['vYEnd'],
+                    keep_prob: 1.0}
+            val_sum, val_loss  = sess.run([model.merged_summary, model.loss], feed_dict=feed_dict)
+            if val_loss < min_val_loss:
+                saver.save(sess, save_model_path + '/model')
+                min_val_loss = val_loss
 
-#            train_writer.add_summary(train_sum, e)
-#            val_writer.add_summary(val_sum, e)
+            train_writer.add_summary(train_sum, e)
+            val_writer.add_summary(val_sum, e)
 
         # Load best graph on validation data
         new_saver = tf.train.import_meta_graph(save_model_path + '/model.meta')
