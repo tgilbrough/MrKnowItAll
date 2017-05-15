@@ -59,7 +59,7 @@ class Model:
 
             tf.get_variable_scope().reuse_variables()
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('context_output', context_output)
@@ -112,7 +112,8 @@ class Model:
             #tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
-            inputs = tf.concat([xq, xq_output_2, tf.tile(tf.expand_dims(logits_start, 1), [1, self.max_x, 1])], axis=2)
+            a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
+            inputs = tf.concat([xq, xq_output_2, a1i, xq_output_2 * a1i], axis=2)
             outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
             xq_fw_end, xq_bw_end = outputs_xq_end
             
