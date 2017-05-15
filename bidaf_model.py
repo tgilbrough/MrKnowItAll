@@ -59,11 +59,7 @@ class Model:
 
             tf.get_variable_scope().reuse_variables()
 
-<<<<<<< HEAD
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(cell, cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
-=======
             outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32, scope='u1')
->>>>>>> 01eea2cf30490de3647694a2bb011a0ff7d2f0ce
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
             #tf.summary.histogram('context_output', context_output)
