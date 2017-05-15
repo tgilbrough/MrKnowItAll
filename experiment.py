@@ -3,7 +3,7 @@ import subprocess
 
 
 QUESTION_TYPES = ['description', 'entity', 'location', 'numeric', 'person']
-MODELS = ['baseline', 'attention', 'coattention']
+MODELS = ['baseline', 'attention', 'coattention', 'bidaf']
 
 def get_permutations(all_options):
     """ {'a': [1,2], 'b': [3, 4], 'c': 5} ->
@@ -36,10 +36,11 @@ def get_args():
     parser.add_argument('--hidden_size', '-hs', type=int, default=100, nargs='+')
     parser.add_argument('--emb_size', '-es', type=int, default=50, nargs='+') # this could be 50 (171.4 MB), 100 (347.1 MB), 200 (693.4 MB), or 300 (1 GB)
     parser.add_argument('--epochs', '-e', type=int, default=50, nargs='+')
-    parser.add_argument('--batch_size', '-bs', type=int, default=64, nargs='+')
+    parser.add_argument('--batch_size', '-bs', type=int, default=256, nargs='+')
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01, nargs='+')
     parser.add_argument('--model', '-m', default='baseline', nargs='+', choices=MODELS + ['all'])
-    parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
+    parser.add_argument('--cell', '-c', default='lstm', choices=['lstm', 'gru'], nargs='+')
+    parser.add_argument('--highway_network', '-hwn', type=int, default=1)
 
     args = vars(parser.parse_args())
     if 'all' in args['question_type']:

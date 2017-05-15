@@ -7,7 +7,6 @@ import sys
 import baseline_model
 import attention_model
 import coattention_model
-import linked_outputs
 import bidaf_model
 
 from data import Data
@@ -25,13 +24,10 @@ def get_parser():
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
     parser.add_argument('--model', '-m', default='baseline', 
-                        choices=['baseline', 'attention', 'coattention', 'linked_outputs', 'bidaf'])
+                        choices=['baseline', 'attention', 'coattention', 'bidaf'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
-    parser.add_argument('--pool_size', '-ps', type=int, default=16)
-    parser.add_argument('--max_decode_steps', '-ds', type=int, default=5)
     parser.add_argument('--cell', '-c', default='lstm')
     parser.add_argument('--highway_network', '-hwn', type=int, default=1)
-    parser.add_argument('--q2c_attention', '-q2c', type=int, default=1)
 
     return parser
 
@@ -202,8 +198,6 @@ def main():
         print('begin accuracy: {}'.format(float(begin_corr) / total))
         print('end accuracy: {}'.format(float(end_corr) / total))
 
-
-        
         data.saveAnswersForEval(config.question_type, config.tensorboard_name, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
 
 if __name__ == "__main__":
