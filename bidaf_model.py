@@ -14,7 +14,6 @@ class Model:
         self.cell = config.cell
         self.highway_network_use = config.highway_network
         self.batch_size = config.batch_size
-        self.q2c = config.q2c_attention
 
     def build(self, x, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
         """
@@ -27,7 +26,6 @@ class Model:
         with tf.variable_scope('embedding_matrix'):
             # [V, d]
             emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
-            #tf.summary.histogram('emb_mat', emb_mat)
         
         with tf.variable_scope('embedding_context'):
             # [N, MX, d]
@@ -44,6 +42,8 @@ class Model:
                 context = self.highway_network(context, layers, carry_bias)
                 tf.get_variable_scope().reuse_variables()
                 question = self.highway_network(question, layers, carry_bias)
+                tf.summary.histogram('context', context)
+                tf.summary.histogram('question', question)
 
         if self.cell == 'gru':
             cell = GRUCell(self.dim)
@@ -55,14 +55,14 @@ class Model:
             outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
-            #tf.summary.histogram('question_output', question_output)
+            tf.summary.histogram('question_output', question_output)
 
             tf.get_variable_scope().reuse_variables()
 
             outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
-            #tf.summary.histogram('context_output', context_output)
+            tf.summary.histogram('context_output', context_output)
 
         q_mask = tf.sequence_mask(q_len, self.max_q)
         x_mask = tf.sequence_mask(x_len, self.max_x)
@@ -78,7 +78,7 @@ class Model:
             logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10  # [N, MX, MQ]
             probs = tf.nn.softmax(logits)
             sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2)
-            #tf.summary.histogram('sum_q', sum_q)
+            tf.summary.histogram('sum_q', sum_q)
 
         with tf.variable_scope('query_to_context_attention'):
             mx_1 = tf.reduce_max(logits, axis=2)  # [N, MX]
@@ -86,10 +86,7 @@ class Model:
             mx_3 = tf.expand_dims(tf.expand_dims(mx_2, -1), -1)
             sum_x = tf.reduce_sum(x_exp * mx_3, axis=2)
 
-        if self.q2c:
-            xq = tf.concat([context_output, sum_q, context_output * sum_q, context_output * sum_x], axis=2)
-        else:
-            xq = tf.concat([context_output, sum_q, context_output * sum_q], axis=2)  # [N, MX, 6d]
+        xq = tf.concat([context_output, sum_q, context_output * sum_q, context_output * sum_x], axis=2)
 
         with tf.variable_scope('post_process_1'):
             outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
@@ -100,7 +97,7 @@ class Model:
             outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
             xq_fw_2, xq_bw_2 = outputs_xq_2
             xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
-            #tf.summary.histogram('xq_output', xq_output_2)
+            tf.summary.histogram('xq_output', xq_output_2)
 
         with tf.variable_scope('start_index'):
             # Get rid of the sequence dimension
@@ -109,7 +106,7 @@ class Model:
             val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, MX]
             logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_start = tf.argmax(logits_start, axis=1, name='starting_index')  # [N]
-            #tf.summary.histogram('yp_start', yp_start)
+            tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
             a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
@@ -123,7 +120,7 @@ class Model:
             val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
             logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
             yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
-            #tf.summary.histogram('yp_end', yp_end)
+            tf.summary.histogram('yp_end', yp_end)
 
         with tf.variable_scope('loss'):
             loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits_start), name='beginning_loss')
@@ -154,24 +151,6 @@ class Model:
         return curr
 
     def highway_layer(self, x, carry_bias):
-        # W = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
-        # b = tf.Variable(tf.constant(0.1, shape=[self.dim]))
-
-        # W = tf.tile(tf.expand_dims(W, 0), [self.batch_size, 1, 1])
-        # #b = tf.tile(tf.expand_dims(b, 0), [self.batch_size, 1])
-
-        # W_T = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1))
-        # b_T = tf.Variable(tf.constant(carry_bias, shape=[self.dim]))
-
-        # W_T = tf.tile(tf.expand_dims(W_T, 0), [self.batch_size, 1, 1])
-        # #b_T = tf.tile(tf.expand_dims(b_T, 0), [self.batch_size, 1])
-
-        # H = tf.nn.relu(tf.matmul(x, W) + b)
-        # T = tf.sigmoid(tf.matmul(x, W_T) + b_T)
-        # C = tf.subtract(1.0, T)
-
-        # y = tf.multiply(H, T) + tf.multiply(x, C)
-
         W_T = tf.Variable(tf.truncated_normal([self.dim, self.dim], stddev=0.1), name="weight_transform")
         b_T = tf.Variable(tf.constant(carry_bias, shape=[self.dim]), name="bias_transform")
 
