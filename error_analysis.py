@@ -114,15 +114,18 @@ for reference in reference_generator:
            for candidate in candidates):
         print('candidate and reference query id do not match')
 
-    query = next(query for query in query_generator
-                 if query['query_id'] == reference['query_id'])
+    try:
+        query = next(query for query in query_generator
+                     if query['query_id'] == reference['query_id'])
 
-    passage = next(get_text(passage) for passage in query['passages']
-                   if passage['is_selected'] == 1 and
-                   reference['answers'][0] in get_text(passage))
+        passage = next(get_text(passage) for passage in query['passages']
+                       if passage['is_selected'] == 1 and
+                       reference['answers'][0] in get_text(passage))
 
-    print_query(query, passage, reference['answers'][0],
-                [candidate['answers'][0] for candidate in candidates])
+        print_query(query, passage, reference['answers'][0],
+                    [candidate['answers'][0] for candidate in candidates])
+    except StopIteration:
+        pass
 
 
 print('''
