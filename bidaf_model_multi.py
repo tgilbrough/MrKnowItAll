@@ -6,7 +6,7 @@ from tensorflow.contrib.rnn import GRUCell
 
 class Model:
     def __init__(self, config, max_x, max_q):
-        self.model_name = 'bidaf'
+        self.model_name = 'bidaf_multi'
         self.dim = config.hidden_size
         self.max_x = max_x
         self.max_q = max_q
