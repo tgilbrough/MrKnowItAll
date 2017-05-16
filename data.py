@@ -29,6 +29,7 @@ class Data:
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
         vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
+        self.vocab = vocab
 
         # Reserve 0 for masking via pad_sequences
         self.vocab_size = len(vocab) + 1
@@ -166,7 +167,7 @@ class Data:
             yield current
         return ' '.join(join_punctuation(sent))
 
-    
+
 
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
@@ -264,7 +265,7 @@ class Data:
     def saveAnswersForEval(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         ref_fn = './references/' + questionType + '.json'
         can_fn = './candidates/' + candidateName + '.json'
-        
+
         rf = open(ref_fn, 'w', encoding='utf-8')
         cf = open(can_fn, 'w', encoding='utf-8')
 

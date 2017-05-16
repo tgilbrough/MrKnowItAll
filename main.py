@@ -23,7 +23,7 @@ def get_parser():
     parser.add_argument('--batch_size', '-b', type=int, default=256)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
-    parser.add_argument('--model', '-m', default='baseline', 
+    parser.add_argument('--model', '-m', default='baseline',
                         choices=['baseline', 'attention', 'coattention', 'bidaf'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--cell', '-c', default='lstm')
@@ -31,11 +31,16 @@ def get_parser():
 
     return parser
 
+
+def fill_paths(config):
+    config.train_path = '{}{}.json'.format('./datasets/msmarco/train/', config.question_type)
+    config.val_path = '{}{}.json'.format('./datasets/msmarco/dev/', config.question_type)
+
+
 def main():
     parser = get_parser()
     config = parser.parse_args()
-    config.train_path = '{}{}.json'.format('./datasets/msmarco/train/', config.question_type)
-    config.val_path = '{}{}.json'.format('./datasets/msmarco/dev/', config.question_type)
+    fill_paths(config)
 
     load_model = config.load_model
 
@@ -79,6 +84,10 @@ def main():
 
     model.build(x, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
 
+    # Save these operation so that we can use them for the demo.
+    tf.add_to_collection('logits', model.logits1)
+    tf.add_to_collection('logits', model.logits2)
+
     print('Computation graph completed.')
 
     train_step = tf.train.AdamOptimizer(config.learning_rate).minimize(model.loss)
@@ -91,6 +100,10 @@ def main():
     val_writer = tf.summary.FileWriter(tensorboard_path + '/dev')
 
     # For saving models
+    for word in data.vocab:
+        tf.add_to_collection('vocab', word)
+    tf.add_to_collection('dimensions', data.max_context_size)
+    tf.add_to_collection('dimensions', data.max_ques_size)
     saver = tf.train.Saver()
     min_val_loss = float('Inf')
 
