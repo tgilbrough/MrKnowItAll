@@ -54,7 +54,7 @@ def main():
 
     # shape = batch_size by num_features
     x = [tf.placeholder(tf.int32, shape=[None, data.max_context_size], name=('x'+str(i))) for i in range(data.max_passages)]
-    x_weights = tf.placeholder(tf.float32, shape=[None, data.tX[0].shape[0]], name='x_weights')
+    x_weights = tf.placeholder(tf.float32, shape=[None, data.max_passages], name='x_weights')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
     q = tf.placeholder(tf.int32, shape=[None, data.tXq[0].shape[0]], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
@@ -93,18 +93,23 @@ def main():
                 for i in tqdm(range(number_of_train_batches)):
                     trainBatch = data.getRandomTrainBatch()
 
-                    feed_dict={x: trainBatch['tX'],
+                    print(trainBatch['tXPassWeights'])
+
+                    feed_dict={
                                 x_weights: trainBatch['tXPassWeights'],
-                                x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                                x_len: [data.max_context_size for i in range(len(trainBatch['tX']))],
                                 q: trainBatch['tXq'],
-                                q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
+                                q_len: [data.max_ques_size for i in range(len(trainBatch['tXq']))],
                                 y_begin: trainBatch['tYBegin'],
                                 y_end: trainBatch['tYEnd'],
                                 keep_prob: config.keep_prob}
+                    tX_trans = np.transpose(trainBatch['tX'], (1, 0, 2))
+                    for j in range(len(x)):
+                        feed_dict[x[j]] = tX_trans[j]
                     sess.run(train_step, feed_dict=feed_dict)
 
                 # Record results for tensorboard, once per epoch
-                feed_dict={x: trainBatch['tX'],
+                feed_dict={
                         x_weights: trainBatch['tXPassWeights'],
                         x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                         q: trainBatch['tXq'],
@@ -112,10 +117,13 @@ def main():
                         y_begin: trainBatch['tYBegin'],
                         y_end: trainBatch['tYEnd'],
                         keep_prob: 1.0}
+                tX_trans = np.transpose(trainBatch['tX'], (1, 0, 2))
+                for j in range(len(x)):
+                    feed_dict[x[j]] = tX_trans[j]
                 train_sum = sess.run(model.merged_summary, feed_dict=feed_dict)
 
                 valBatch = data.getRandomValBatch()
-                feed_dict={x: valBatch['vX'],
+                feed_dict={
                         x_weights: valBatch['vXPassWeights'],
                         x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                         q: valBatch['vXq'],
@@ -123,6 +131,9 @@ def main():
                         y_begin: valBatch['vYBegin'],
                         y_end: valBatch['vYEnd'],
                         keep_prob: 1.0}
+                vX_trans = np.transpose(valBatch['vX'], (1, 0, 2))
+                for j in range(len(x)):
+                    feed_dict[x[j]] = vX_trans[j]
                 val_sum, val_loss  = sess.run([model.merged_summary, model.loss], feed_dict=feed_dict)
                 if val_loss < min_val_loss:
                     saver.save(sess, save_model_path + '/model')
@@ -156,14 +167,17 @@ def main():
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
 
-            feed_dict={x: valBatch['vX'],
-                            x_weights: valBatch['vXPassWeights'],
-                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
-                            q: valBatch['vXq'],
-                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
-                            y_begin: valBatch['vYBegin'],
-                            y_end: valBatch['vYEnd'],
-                            keep_prob: 1.0}
+            feed_dict={
+                        x_weights: valBatch['vXPassWeights'],
+                        x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
+                        q: valBatch['vXq'],
+                        q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
+                        y_begin: valBatch['vYBegin'],
+                        y_end: valBatch['vYEnd'],
+                        keep_prob: 1.0}
+            vX_trans = np.transpose(valBatch['vX'], (1, 0, 2))
+            for j in range(len(x)):
+                feed_dict[x[j]] = vX_trans[j]
             (begin,) = sess.run([prediction_begin], feed_dict=feed_dict)
 
 

@@ -122,7 +122,11 @@ class Model:
                     batch_index = tf.range(start=0, limit=tf.shape(logits_start)[0], delta=1)
                     temp = tf.stack([batch_index, passage_index * tf.ones([tf.shape(logits_start)[0]], tf.int32)], axis=1)
 
-                    logits_start = tf.multiply(logits_start, tf.gather_nd(params=x_weights, indices=temp))
+                    passage_weight = tf.expand_dims(tf.gather_nd(params=x_weights, indices=temp), -1)
+
+                    passage_weight = tf.Print(passage_weight, [passage_weight])
+
+                    logits_start = tf.multiply(logits_start, passage_weight)
 
                     # Concat logits_start
                     if passage_index == 0:

@@ -29,9 +29,6 @@ class Data:
         self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
             self.maxLenVContext, self.maxLenVQuestion, self.maxVPasssages = self.splitMsmarcoDatasets(valData)
 
-        self.tPassWeights = self.passageRevelevance(self.tContext, self.tQuestion)
-        self.vPassWeights = self.passageRevelevance(self.vContext, self.vQuestion)
-
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
         vocab = self.buildVocab([t for p in self.tContext for t in p] + self.tQuestion + [t for p in self.vContext for t in p] + self.vQuestion)
@@ -46,6 +43,9 @@ class Data:
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
         self.embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
+
+        self.tPassWeights = self.passageRevelevance(self.tContext, self.tQuestion, self.max_passages)
+        self.vPassWeights = self.passageRevelevance(self.vContext, self.vQuestion, self.max_passages)
 
         # vectorize training and validation datasets
         print('Begin vectorizing process...')
@@ -281,36 +281,25 @@ class Data:
                 context.append(0)
         return X
 
-    def passageRevelevance(self, xContext, xQuestion):
+    def passageRevelevance(self, xContext, xQuestion, maxPassages):
         cs = []
         for i in range(len(xContext)):
-            passages = [' '.join(p) for p in xContext[i]] 
+            passages = [' '.join(p) for p in xContext[i]]
 
             tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
             
-            # Apply softmax
-            cosine_similarities = [math.exp(x) for x in cosine_similarities]
+            # Normalize
+            # cosine_similarities = [math.exp(x) for x in cosine_similarities]
             sum_cs = sum(cosine_similarities)
             cosine_similarities = [x / sum_cs for x in cosine_similarities]
             
+            for _ in range(maxPassages - len(cosine_similarities)):
+                cosine_similarities.append(0.0)
+
             cs.append(cosine_similarities)
         
         return cs
-
-    def passageWeight(self, passRel, passLen, max_len):
-        ret = []
-        for i in range(len(passLen)):
-            passWeight = []
-            for r, l in zip(passRel[i], passLen[i]):
-                for _ in range(l):
-                    passWeight.append(r)
-
-            for i in range(max_len - len(passWeight)):
-                passWeight.append(0.0)
-
-            ret.append(passWeight)
-        return ret
 
     def saveAnswersForEval(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         ref_fn = './references/' + questionType + '.json'
