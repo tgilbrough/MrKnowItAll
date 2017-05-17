@@ -195,7 +195,7 @@ class Data:
         maxPassages = 0
 
         # For now only pick out selected passages that have answers directly inside the passage
-        for data in f['data'][:100]:
+        for data in f['data']:
             passages = []
 
             answerFound = False

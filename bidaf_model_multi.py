@@ -124,8 +124,6 @@ class Model:
 
                     passage_weight = tf.expand_dims(tf.gather_nd(params=x_weights, indices=temp), -1)
 
-                    passage_weight = tf.Print(passage_weight, [passage_weight])
-
                     logits_start = tf.multiply(logits_start, passage_weight)
 
                     # Concat logits_start

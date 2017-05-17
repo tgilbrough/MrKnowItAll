@@ -93,8 +93,6 @@ def main():
                 for i in tqdm(range(number_of_train_batches)):
                     trainBatch = data.getRandomTrainBatch()
 
-                    print(trainBatch['tXPassWeights'])
-
                     feed_dict={
                                 x_weights: trainBatch['tXPassWeights'],
                                 x_len: [data.max_context_size for i in range(len(trainBatch['tX']))],
