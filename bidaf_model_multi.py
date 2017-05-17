@@ -65,8 +65,9 @@ class Model:
             tf.summary.histogram('context_output', context_output)
 
         with tf.variable_scope('passage_weighting'):
-            tiled_weights = tf.tile(tf.expand_dims(x_weights, axis=2), [1, 1, 2 * self.dim]) # [N, MX, 2d]
-            context_output = tf.multiply(tiled_weights, context_output)
+            #tiled_weights = tf.tile(tf.expand_dims(x_weights, axis=2), [1, 1, 2 * self.dim]) # [N, MX, 2d]
+            #context_output = tf.multiply(tiled_weights, context_output)
+            pass
 
         q_mask = tf.sequence_mask(q_len, self.max_q)
         x_mask = tf.sequence_mask(x_len, self.max_x)
@@ -113,35 +114,36 @@ class Model:
             tf.summary.histogram('yp_start', yp_start)
 
         with tf.variable_scope('end_index'):
-            a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
-            inputs = tf.concat([xq, xq_output_2, a1i, xq_output_2 * a1i], axis=2)
-            outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
-            xq_fw_end, xq_bw_end = outputs_xq_end
+            #a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
+            #inputs = tf.concat([xq, xq_output_2, a1i, xq_output_2 * a1i], axis=2)
+            #outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
+            #xq_fw_end, xq_bw_end = outputs_xq_end
             
-            xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
+            #xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
 
-            xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
-            logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
-            yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
-            tf.summary.histogram('yp_end', yp_end)
+            #xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
+            #val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
+            #logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
+            #yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
+            #tf.summary.histogram('yp_end', yp_end)
+            pass
 
         with tf.variable_scope('loss'):
             loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits_start), name='beginning_loss')
-            loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits_end), name='ending_loss')
-            loss = loss1 + loss2
+            #loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits_end), name='ending_loss')
+            loss = loss1 #+ loss2
         with tf.variable_scope('accuracy'):
             acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits_start, 1), 'int32')), 'float'), name='beginning_accuracy')
-            acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits_end, 1), 'int32')), 'float'), name='ending_accuracy')
+            #acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits_end, 1), 'int32')), 'float'), name='ending_accuracy')
 
         tf.summary.scalar('loss', loss)
-        tf.summary.scalar('loss1', loss1)
-        tf.summary.scalar('loss2', loss2)
+        #tf.summary.scalar('loss1', loss1)
+        #tf.summary.scalar('loss2', loss2)
         tf.summary.scalar('accuracy1', acc1)
-        tf.summary.scalar('accuracy2', acc2)
+        #tf.summary.scalar('accuracy2', acc2)
 
         self.logits1 = logits_start
-        self.logits2 = logits_end
+        #self.logits2 = logits_end
 
         self.loss = loss
         self.merged_summary = tf.summary.merge_all()
