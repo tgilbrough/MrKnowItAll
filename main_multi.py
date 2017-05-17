@@ -51,7 +51,7 @@ def main():
     print('Building tensorflow computation graph...')
 
     # Placeholdes for model
-    x = [tf.placeholder(tf.int32, shape=[None, data.max_context_size], name=('x'+str(i))) for i in range(data.max_passages)]
+    x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
     x_weights = tf.placeholder(tf.float32, shape=[None, data.max_passages], name='x_weights')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
     q = tf.placeholder(tf.int32, shape=[None, data.max_ques_size], name='q')
