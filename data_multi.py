@@ -21,29 +21,27 @@ class Data:
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
         self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
-            self.maxLenTContext, self.maxLenTQuestion, tPassageLengths = self.splitMsmarcoDatasets(trainData)
+            self.maxLenTContext, self.maxLenTQuestion, self.maxTPasssages = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
         self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
-            self.maxLenVContext, self.maxLenVQuestion, vPassageLengths = self.splitMsmarcoDatasets(valData)
+            self.maxLenVContext, self.maxLenVQuestion, self.maxVPasssages = self.splitMsmarcoDatasets(valData)
 
-        self.tPassRel = self.passageRevelevance(self.tContext, self.tQuestion, tPassageLengths)
-        self.vPassRel = self.passageRevelevance(self.vContext, self.vQuestion, vPassageLengths)
+        self.tPassWeights = self.passageRevelevance(self.tContext, self.tQuestion)
+        self.vPassWeights = self.passageRevelevance(self.vContext, self.vQuestion)
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
-        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion)
+        vocab = self.buildVocab([t for p in self.tContext for t in p] + self.tQuestion + [t for p in self.vContext for t in p] + self.vQuestion)
 
         # Reserve 0 for masking via pad_sequences
         self.vocab_size = len(vocab) + 1
         word_index = dict((c, i + 1) for i, c in enumerate(vocab))
         self.max_context_size = max(self.maxLenTContext, self.maxLenVContext)
         self.max_ques_size = max(self.maxLenTQuestion, self.maxLenVQuestion)
-
-        self.tPassWeights = self.passageWeight(self.tPassRel, tPassageLengths, self.max_context_size)
-        self.vPassWeights = self.passageWeight(self.vPassRel, vPassageLengths, self.max_context_size)
+        self.max_passages = max(self.maxTPasssages, self.maxVPasssages)
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
@@ -71,13 +69,11 @@ class Data:
         self.tXq = np.array(self.tXq)
         self.tYBegin = np.array(self.tYBegin)
         self.tYEnd = np.array(self.tYEnd)
-        self.tPassRel = np.array(self.tPassRel)
         self.tPassWeights = np.array(self.tPassWeights)
         self.vX = np.array(self.vX)
         self.vXq = np.array(self.vXq)
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
-        self.vPassRel = np.array(self.vPassRel)
         self.vPassWeights = np.array(self.vPassWeights)
         self.vContext = np.array(self.vContext, dtype=object)
         self.vQuestionID = np.array(self.vQuestionID, dtype=object)
@@ -184,26 +180,23 @@ class Data:
             yield current
         return ' '.join(join_punctuation(sent))
 
-    
-
     def splitMsmarcoDatasets(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
            and keep track of max context and question lengths.
         '''
-        xContext = [] # list of contexts paragraphs
+        xContext = [] # list of list of contexts paragraphs
         xQuestion = [] # list of questions
         xQuestionID = [] # list of question id
         xAnswerBegin = [] # list of indices of the beginning word in each answer span
         xAnswerEnd = [] # list of indices of the ending word in each answer span
         xAnswerText = [] # list of the answer text
-        xPassageLengths = [] # list of the passage lengths
         maxLenContext = 0
         maxLenQuestion = 0
+        maxPassages = 0
 
         # For now only pick out selected passages that have answers directly inside the passage
-        for data in f['data']:
+        for data in f['data'][:100]:
             passages = []
-            passageLengths = []
 
             answerFound = False
             answerBegin = -1
@@ -212,7 +205,6 @@ class Data:
             for passage in data['passages']:
                 context = passage['passage_text']
                 contextTokenized = self.tokenize(context.lower())
-                passageLengths.append(len(contextTokenized))
 
                 # Find answer in selected passage
                 if passage['is_selected'] and not answerFound:
@@ -221,15 +213,19 @@ class Data:
                         answerBeginIndex, answerEndIndex = self.findAnswer(contextTokenized, answerTokenized)
                         if answerBeginIndex != -1:
                             answerFound = True
-                            answerBegin = answerBeginIndex + len(passages)
-                            answerEnd = answerEndIndex + len(passages)
+                            answerBegin = answerBeginIndex + sum(len(p) for p in passages)
+                            answerEnd = answerEndIndex + sum(len(p) for p in passages)
                             break
 
-                passages += contextTokenized
+                passages.append(contextTokenized)
 
-            contextLength = len(passages)
-            if contextLength > maxLenContext:
-                maxLenContext = contextLength
+                contextLength = len(contextTokenized)
+                if contextLength > maxLenContext:
+                    maxLenContext = contextLength
+
+            numPassages = len(passages)
+            if numPassages > maxPassages:
+                maxPassages = numPassages
 
             question = data['query']
             questionTokenized = self.tokenize(question.lower())
@@ -238,17 +234,6 @@ class Data:
 
             questionID = data['query_id']
 
-            # If we could not find answer, check all passages
-            if not answerFound:
-                for answer in data['answers']:
-                    answerTokenized = self.tokenize(answer.lower())
-                    answerBeginIndex, answerEndIndex = self.findAnswer(passages, answerTokenized)
-                    if answerBeginIndex != -1:
-                        answerFound = True
-                        answerBegin = answerBeginIndex
-                        answerEnd = answerEndIndex
-                        break
-
             if answerFound:
                 xContext.append(passages)
                 xQuestion.append(questionTokenized)
@@ -256,9 +241,8 @@ class Data:
                 xAnswerBegin.append(answerBegin)
                 xAnswerEnd.append(answerEnd)
                 xAnswerText.append(answer)
-                xPassageLengths.append(passageLengths)
 
-        return xContext, xQuestion, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, xPassageLengths
+        return xContext, xQuestion, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, maxPassages
 
     def findAnswer(self, contextTokenized, answerTokenized):
         contextLen = len(contextTokenized)
@@ -278,16 +262,18 @@ class Data:
         YBegin = []
         YEnd = []
         for i in range(len(xContext)):
-            x = [word_index[w] for w in xContext[i]]
+            xs = [[word_index[w] for w in p] for p in xContext[i]]
+            for _ in range(self.max_passages - len(xs)):
+                xs.append([0])
             xq = [word_index[w] for w in xQuestion[i]]
             # map the first and last words of answer span to one-hot representations
             y_Begin =  xAnswerBegin[i]
             y_End = xAnswerEnd[i] - 1
-            X.append(x)
+            X.append(self.pad_sequences(xs, self.max_context_size))
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
-        return self.pad_sequences(X, self.max_context_size), self.pad_sequences(Xq, self.max_ques_size), YBegin, YEnd
+        return X, self.pad_sequences(Xq, self.max_ques_size), YBegin, YEnd
 
     def pad_sequences(self, X, maxlen):
         for context in X:
@@ -295,14 +281,10 @@ class Data:
                 context.append(0)
         return X
 
-    def passageRevelevance(self, xContext, xQuestion, xPassageLengths):
+    def passageRevelevance(self, xContext, xQuestion):
         cs = []
         for i in range(len(xContext)):
-            passages = []
-            prev_end = 0
-            for j in xPassageLengths[i]:
-                passages.append(' '.join(xContext[i][prev_end : prev_end + j]))
-                prev_end += j
+            passages = [' '.join(p) for p in xContext[i]] 
 
             tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]

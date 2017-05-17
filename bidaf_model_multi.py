@@ -15,7 +15,7 @@ class Model:
         self.highway_network_use = config.highway_network
         self.batch_size = config.batch_size
 
-    def build(self, x, x_weights, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
+    def build(self, xs, x_weights, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
         """
         d: dim
         N: batch_size
@@ -27,113 +27,135 @@ class Model:
             # [V, d]
             emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
         
-        with tf.variable_scope('embedding_context'):
-            # [N, MX, d]
-            context = tf.nn.embedding_lookup(emb_mat, x, name='context')
+        with tf.variable_scope('multi_passage'):
+            for passage_index in range(len(xs)):
+                if passage_index > 0:
+                    tf.get_variable_scope().reuse_variables()
 
-        with tf.variable_scope('embedding_question'):
-            # [N, MQ, d]
-            question = tf.nn.embedding_lookup(emb_mat, q, name='question')
+                x = xs[passage_index]
 
-        with tf.variable_scope('highway_network'):
-            if self.highway_network_use:
-                layers = 2
-                carry_bias = -1.0
-                context = self.highway_network(context, layers, carry_bias)
-                tf.get_variable_scope().reuse_variables()
-                question = self.highway_network(question, layers, carry_bias)
-                tf.summary.histogram('context', context)
-                tf.summary.histogram('question', question)
+                with tf.variable_scope('embedding_context'):
+                    # [N, MX, d]
+                    context = tf.nn.embedding_lookup(emb_mat, x, name='context')
 
-        if self.cell == 'gru':
-            cell = GRUCell(self.dim)
-        else:
-            cell = LSTMCell(self.dim)
-        d_cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
+                with tf.variable_scope('embedding_question'):
+                    # [N, MQ, d]
+                    question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
-        with tf.variable_scope('encoding'):
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
-            question_fw, question_bw = outputs_question
-            question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
-            tf.summary.histogram('question_output', question_output)
+                with tf.variable_scope('highway_network'):
+                    if self.highway_network_use:
+                        layers = 2
+                        carry_bias = -1.0
+                        context = self.highway_network(context, layers, carry_bias)
+                        tf.get_variable_scope().reuse_variables()
+                        question = self.highway_network(question, layers, carry_bias)
+                        tf.summary.histogram('context', context)
+                        tf.summary.histogram('question', question)
 
-            tf.get_variable_scope().reuse_variables()
+                if self.cell == 'gru':
+                    cell = GRUCell(self.dim)
+                else:
+                    cell = LSTMCell(self.dim)
+                d_cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
-            context_fw, context_bw = outputs_context
-            context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
-            tf.summary.histogram('context_output', context_output)
+                with tf.variable_scope('encoding'):
+                    outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
+                    question_fw, question_bw = outputs_question
+                    question_output = tf.concat([question_fw, question_bw], axis=2)  # [N, MQ, 2d]
+                    tf.summary.histogram('question_output', question_output)
 
-        with tf.variable_scope('passage_weighting'):
-            #tiled_weights = tf.tile(tf.expand_dims(x_weights, axis=2), [1, 1, 2 * self.dim]) # [N, MX, 2d]
-            #context_output = tf.multiply(tiled_weights, context_output)
-            pass
+                    tf.get_variable_scope().reuse_variables()
 
-        q_mask = tf.sequence_mask(q_len, self.max_q)
-        x_mask = tf.sequence_mask(x_len, self.max_x)
+                    outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
+                    context_fw, context_bw = outputs_context
+                    context_output = tf.concat([context_fw, context_bw], axis=2)  # [N, MX, 2d]
+                    tf.summary.histogram('context_output', context_output)
 
-        with tf.variable_scope('attention'):
-            x_exp = tf.tile(tf.expand_dims(context_output, axis=2), [1, 1, self.max_q, 1])  # [N, MX, MQ, 2d]
-            q_exp = tf.tile(tf.expand_dims(question_output, axis=1), [1, self.max_x, 1, 1])  # [N, MX, MQ, 2d]
-            inputs = tf.concat([x_exp, q_exp, x_exp * q_exp], 3)  # [N, MX, MQ, 6d]
-            val = tf.reshape(tf.layers.dense(inputs=inputs, units=1), [-1, self.max_x, self.max_q])
+                with tf.variable_scope('passage_weighting'):
+                    #tiled_weights = tf.tile(tf.expand_dims(x_weights, axis=2), [1, 1, 2 * self.dim]) # [N, MX, 2d]
+                    #context_output = tf.multiply(tiled_weights, context_output)
+                    pass
 
-        with tf.variable_scope('contex_to_query_attention'):
-            mask = tf.tile(tf.expand_dims(x_mask, -1), [1, 1, self.max_q]) & tf.expand_dims(q_mask, 1)  # [N, MX, MQ]
-            logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10  # [N, MX, MQ]
-            probs = tf.nn.softmax(logits)
-            sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2)
-            tf.summary.histogram('sum_q', sum_q)
+                q_mask = tf.sequence_mask(q_len, self.max_q)
+                x_mask = tf.sequence_mask(x_len, self.max_x)
 
-        with tf.variable_scope('query_to_context_attention'):
-            mx_1 = tf.reduce_max(logits, axis=2)  # [N, MX]
-            mx_2 = tf.nn.softmax(mx_1)  # [N, MX]
-            mx_3 = tf.expand_dims(tf.expand_dims(mx_2, -1), -1)
-            sum_x = tf.reduce_sum(x_exp * mx_3, axis=2)
+                with tf.variable_scope('attention'):
+                    x_exp = tf.tile(tf.expand_dims(context_output, axis=2), [1, 1, self.max_q, 1])  # [N, MX, MQ, 2d]
+                    q_exp = tf.tile(tf.expand_dims(question_output, axis=1), [1, self.max_x, 1, 1])  # [N, MX, MQ, 2d]
+                    inputs = tf.concat([x_exp, q_exp, x_exp * q_exp], 3)  # [N, MX, MQ, 6d]
+                    val = tf.reshape(tf.layers.dense(inputs=inputs, units=1), [-1, self.max_x, self.max_q])
 
-        xq = tf.concat([context_output, sum_q, context_output * sum_q, context_output * sum_x], axis=2)
+                with tf.variable_scope('contex_to_query_attention'):
+                    mask = tf.tile(tf.expand_dims(x_mask, -1), [1, 1, self.max_q]) & tf.expand_dims(q_mask, 1)  # [N, MX, MQ]
+                    logits = val - (1.0 - tf.cast(mask, 'float')) * 10.0e10  # [N, MX, MQ]
+                    probs = tf.nn.softmax(logits)
+                    sum_q = tf.reduce_sum(q_exp * tf.expand_dims(probs, -1), axis=2)
+                    tf.summary.histogram('sum_q', sum_q)
 
-        with tf.variable_scope('post_process_1'):
-            outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
-            xq_fw_1, xq_bw_1 = outputs_xq_1
-            xq_output_1 = tf.concat([xq_fw_1, xq_bw_1], axis=2)  # [N, MX, 2d]
+                with tf.variable_scope('query_to_context_attention'):
+                    mx_1 = tf.reduce_max(logits, axis=2)  # [N, MX]
+                    mx_2 = tf.nn.softmax(mx_1)  # [N, MX]
+                    mx_3 = tf.expand_dims(tf.expand_dims(mx_2, -1), -1)
+                    sum_x = tf.reduce_sum(x_exp * mx_3, axis=2)
 
-        with tf.variable_scope('post_process_2'):
-            outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
-            xq_fw_2, xq_bw_2 = outputs_xq_2
-            xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
-            tf.summary.histogram('xq_output', xq_output_2)
+                xq = tf.concat([context_output, sum_q, context_output * sum_q, context_output * sum_x], axis=2)
 
-        with tf.variable_scope('start_index'):
-            # Get rid of the sequence dimension
-            xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * MX, 2d]
+                with tf.variable_scope('post_process_1'):
+                    outputs_xq_1, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+                    xq_fw_1, xq_bw_1 = outputs_xq_1
+                    xq_output_1 = tf.concat([xq_fw_1, xq_bw_1], axis=2)  # [N, MX, 2d]
 
-            val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, MX]
-            logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
-            yp_start = tf.argmax(logits_start, axis=1, name='starting_index')  # [N]
-            tf.summary.histogram('yp_start', yp_start)
+                with tf.variable_scope('post_process_2'):
+                    outputs_xq_2, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq_output_1, sequence_length=x_len, dtype=tf.float32)
+                    xq_fw_2, xq_bw_2 = outputs_xq_2
+                    xq_output_2 = tf.concat([xq_fw_2, xq_bw_2], axis=2)  # [N, MX, 2d]
+                    tf.summary.histogram('xq_output', xq_output_2)
 
-        with tf.variable_scope('end_index'):
-            #a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
-            #inputs = tf.concat([xq, xq_output_2, a1i, xq_output_2 * a1i], axis=2)
-            #outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
-            #xq_fw_end, xq_bw_end = outputs_xq_end
-            
-            #xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
+                with tf.variable_scope('start_index'):
+                    # Get rid of the sequence dimension
+                    xq_flat = tf.reshape(xq_output_2, [-1, 2 * self.dim])  # [N * MX, 2d]
 
-            #xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
-            #val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
-            #logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
-            #yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
-            #tf.summary.histogram('yp_end', yp_end)
-            pass
+                    val = tf.reshape(tf.layers.dense(inputs=xq_flat, units=1), [-1, self.max_x])  # [N, MX]
+                    logits_start = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
+
+                    # Weight by passage relevance
+                    batch_index = tf.range(start=0, limit=tf.shape(logits_start)[0], delta=1)
+                    temp = tf.stack([batch_index, passage_index * tf.ones([tf.shape(logits_start)[0]], tf.int32)], axis=1)
+
+                    logits_start = tf.multiply(logits_start, tf.gather_nd(params=x_weights, indices=temp))
+
+                    # Concat logits_start
+                    if passage_index == 0:
+                        ls = logits_start
+                    else:
+                        ls = tf.concat([ls, logits_start], axis=1)
+
+                    yp_start = tf.argmax(logits_start, axis=1, name='starting_index')  # [N]
+                    tf.summary.histogram('yp_start', yp_start)
+
+                with tf.variable_scope('end_index'):
+                    #a1i = tf.tile(tf.expand_dims(logits_start, 2), [1, 1, 2 * self.dim])
+                    #inputs = tf.concat([xq, xq_output_2, a1i, xq_output_2 * a1i], axis=2)
+                    #outputs_xq_end, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=inputs, sequence_length=x_len, dtype=tf.float32)
+                    #xq_fw_end, xq_bw_end = outputs_xq_end
+                    
+                    #xq_output_end = tf.concat([xq_fw_end, xq_bw_end], axis=2)  # [N, MX, 2d]
+
+                    #xq_flat_end = tf.reshape(xq_output_end, [-1, 2 * self.dim])  # [N * MX, 2d]
+                    #val = tf.reshape(tf.layers.dense(inputs=xq_flat_end, units=1), [-1, self.max_x])  # [N, MX]
+                    #logits_end = val - (1.0 - tf.cast(x_mask, 'float')) * 10.0e10
+                    #yp_end = tf.argmax(logits_end, axis=1, name='ending_index')  # [N]
+                    #tf.summary.histogram('yp_end', yp_end)
+                    pass
+
+
 
         with tf.variable_scope('loss'):
-            loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=logits_start), name='beginning_loss')
+            loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=ls), name='beginning_loss')
             #loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=logits_end), name='ending_loss')
             loss = loss1 #+ loss2
         with tf.variable_scope('accuracy'):
-            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits_start, 1), 'int32')), 'float'), name='beginning_accuracy')
+            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(ls, 1), 'int32')), 'float'), name='beginning_accuracy')
             #acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits_end, 1), 'int32')), 'float'), name='ending_accuracy')
 
         tf.summary.scalar('loss', loss)
@@ -142,7 +164,7 @@ class Model:
         tf.summary.scalar('accuracy1', acc1)
         #tf.summary.scalar('accuracy2', acc2)
 
-        self.logits1 = logits_start
+        self.logits1 = ls
         #self.logits2 = logits_end
 
         self.loss = loss
