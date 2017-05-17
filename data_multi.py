@@ -192,7 +192,7 @@ class Data:
         '''
         xContext = [] # list of contexts paragraphs
         xQuestion = [] # list of questions
-        xQuestion_id = [] # list of question id
+        xQuestionID = [] # list of question id
         xAnswerBegin = [] # list of indices of the beginning word in each answer span
         xAnswerEnd = [] # list of indices of the ending word in each answer span
         xAnswerText = [] # list of the answer text
@@ -203,11 +203,28 @@ class Data:
         # For now only pick out selected passages that have answers directly inside the passage
         for data in f['data']:
             passages = []
-            passage_lengths = []
+            passageLengths = []
+
+            answerFound = False
+            answerBegin = -1
+            answerEnd = -1
+
             for passage in data['passages']:
                 context = passage['passage_text']
                 contextTokenized = self.tokenize(context.lower())
-                passage_lengths.append(len(contextTokenized))
+                passageLengths.append(len(contextTokenized))
+
+                # Find answer in selected passage
+                if passage['is_selected'] and not answerFound:
+                    for answer in data['answers']:
+                        answerTokenized = self.tokenize(answer.lower())
+                        answerBeginIndex, answerEndIndex = self.findAnswer(contextTokenized, answerTokenized)
+                        if answerBeginIndex != -1:
+                            answerFound = True
+                            answerBegin = answerBeginIndex + len(passages)
+                            answerEnd = answerEndIndex + len(passages)
+                            break
+
                 passages += contextTokenized
 
             contextLength = len(passages)
@@ -219,22 +236,29 @@ class Data:
             if len(questionTokenized) > maxLenQuestion:
                 maxLenQuestion = len(questionTokenized)
 
-            question_id = data['query_id']
+            questionID = data['query_id']
 
-            for answer in data['answers']:
-                answerTokenized = self.tokenize(answer.lower())
-                answerBeginIndex, answerEndIndex = self.findAnswer(passages, answerTokenized)
-                if answerBeginIndex != -1:
-                    xContext.append(passages)
-                    xQuestion.append(questionTokenized)
-                    xQuestion_id.append(question_id)
-                    xAnswerBegin.append(answerBeginIndex)
-                    xAnswerEnd.append(answerEndIndex)
-                    xAnswerText.append(answer)
-                    xPassageLengths.append(passage_lengths)
-                    break
+            # If we could not find answer, check all passages
+            if not answerFound:
+                for answer in data['answers']:
+                    answerTokenized = self.tokenize(answer.lower())
+                    answerBeginIndex, answerEndIndex = self.findAnswer(passages, answerTokenized)
+                    if answerBeginIndex != -1:
+                        answerFound = True
+                        answerBegin = answerBeginIndex
+                        answerEnd = answerEndIndex
+                        break
 
-        return xContext, xQuestion, xQuestion_id, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, xPassageLengths
+            if answerFound:
+                xContext.append(passages)
+                xQuestion.append(questionTokenized)
+                xQuestionID.append(questionID)
+                xAnswerBegin.append(answerBegin)
+                xAnswerEnd.append(answerEnd)
+                xAnswerText.append(answer)
+                xPassageLengths.append(passageLengths)
+
+        return xContext, xQuestion, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion, xPassageLengths
 
     def findAnswer(self, contextTokenized, answerTokenized):
         contextLen = len(contextTokenized)
@@ -242,7 +266,7 @@ class Data:
         for i in range(contextLen - answerLen + 1):
             match = sum([1 for j, m in zip(contextTokenized[i:i + answerLen], answerTokenized) if j == m])
             if match == answerLen:
-                return (i, i + answerLen + 1)
+                return (i, i + answerLen - 1)
         return (-1, -1)
 
     def vectorizeData(self, xContext, xQuestion, xAnswerBegin, xAnswerEnd, word_index):
