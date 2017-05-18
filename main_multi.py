@@ -43,7 +43,7 @@ def main():
     tf.reset_default_graph()
 
     data = Data(config)
-    
+
     if config.model == 'baseline':
         model = baseline_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using baseline model")
@@ -159,13 +159,15 @@ def main():
         relevanceWeights = []
         logitsStart = []
         logitsEnd = []
+        tePassageIndex = []
 
         begin_corr = 0
         end_corr = 0
         total = 0
 
         print('Getting test data answers')
-        for i in range(number_of_test_batches):
+        for i in range(1):
+        #for i in range(number_of_test_batches):
             testBatch = data.getTestBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
@@ -190,7 +192,7 @@ def main():
                                     y_begin: [0],
                                     y_end: [0],
                                     keep_prob: 1.0}
-                    begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end, 
+                    begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob,
                                                                 softmax_begin, softmax_end], feed_dict=feed_dict)
                     start_score = testBatch['teXPassWeights'][i][p] * begin_prob[0]
@@ -203,8 +205,10 @@ def main():
                     logits_start.append(lb[0].tolist())
                     logits_end.append(le[0].tolist())
                     #print(begin, end, begin_prob, end_prob)
-            
-                teContext.append(testBatch['teContext'][i][passage_idx])
+
+
+                tePassageIndex.append(passage_idx)
+                teContext.append(testBatch['teContext'][i])
                 teQuestionID.append(testBatch['teQuestionID'][i])
                 predictedBegin.append(start_idx)
                 predictedEnd.append(end_idx)
@@ -225,7 +229,7 @@ def main():
         # print('begin accuracy: {}'.format(float(begin_corr) / total))
         # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd)
+        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd, tePassageIndex)
 
 if __name__ == "__main__":
     main()
