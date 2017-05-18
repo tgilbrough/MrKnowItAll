@@ -155,8 +155,6 @@ class Data:
         teQuestionID_batch = self.teQuestionID[points]
         teX_batch = self.teX[points]
         teXq_batch = self.teXq[points]
-        teYBegin_batch = self.teYBegin[points]
-        teYEnd_batch = self.teYEnd[points]
         teXPassWeights_batch = self.tePassWeights[points]
 
         self.testBatchNum += 1
@@ -166,8 +164,7 @@ class Data:
 
         return {'teContext': teContext_batch, 'teQuestionID': teQuestionID_batch,
                 'teX': teX_batch, 'teXq': teXq_batch,
-                'teYBegin': teYBegin_batch, 'teYEnd': teYEnd_batch,
-                'teXPassWeights': tePassWeights_batch}
+                'teXPassWeights': teXPassWeights_batch}
 
     def loadGloveModel(self, gloveFile):
         print("Loading Glove Model...")
@@ -404,16 +401,35 @@ class Data:
         cf.close()
 
     def saveAnswersForEvalTest(self, questionType, candidateName, teContext, teQuestionID, predictedBegin, predictedEnd):
-        can_fn = './candidates/' + candidateName + '.json'
+        can_fn = './candidates_multi/' + candidateName + '.json'
 
         cf = open(can_fn, 'w', encoding='utf-8')
 
-        for i in range(len(vContext)):
+        for i in range(len(teContext)):
             predictedAnswer = ' '.join(teContext[i][predictedBegin[i] : predictedEnd[i] + 1])
 
             candidate = {}
             candidate['query_id'] = teQuestionID[i]
             candidate['answers'] = [predictedAnswer]
+
+            print(json.dumps(candidate, ensure_ascii=False), file=cf)
+
+        cf.close()
+
+    def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd):
+        can_fn = './candidates_multi/' + candidateName + '.json'
+
+        cf = open(can_fn, 'w', encoding='utf-8')
+
+        for i in range(len(teContext)):
+            predictedAnswer = ' '.join(teContext[i][predictedBegin[i] : predictedEnd[i] + 1])
+
+            candidate = {}
+            candidate['query_id'] = teQuestionID[i]
+            candidate['answers'] = [predictedAnswer]
+            candidate['relevance'] = passageWeights[i]
+            candidate['logits_start'] = logitsStart[i]
+            candidate['logits_end'] = logitsEnd[i]
 
             print(json.dumps(candidate, ensure_ascii=False), file=cf)
 

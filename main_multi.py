@@ -156,38 +156,62 @@ def main():
         teQuestionID = []
         predictedBegin = []
         predictedEnd = []
+        relevanceWeights = []
+        logitsStart = []
+        logitsEnd = []
 
         begin_corr = 0
         end_corr = 0
         total = 0
 
+        print('Getting test data answers')
         for i in range(number_of_test_batches):
             testBatch = data.getTestBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
             prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
+            prediction_begin_prob = tf.reduce_max(tf.nn.softmax(model.logits1), 1)
+            prediction_end_prob = tf.reduce_max(tf.nn.softmax(model.logits2), 1)
+            softmax_begin = tf.nn.softmax(model.logits1)
+            softmax_end = tf.nn.softmax(model.logits2)
 
-            print(testBatch)
-
-            for b in testBatch:
-                for p in b['teX']:
-                    feed_dict={x: [p],
-                                    x_len: [len(p)],
-                                    q: [b['teXq']],
-                                    q_len: [len(b['teXq'])],
-                                    y_begin: testBatch['teYBegin'],
-                                    y_end: testBatch['teYEnd'],
+            for i in range(len(testBatch['teXq'])):
+                max_start_score = 0.0
+                passage_idx = 0
+                start_idx = 0
+                end_idx = 0
+                logits_start = []
+                logits_end = []
+                for p in range(len(testBatch['teX'][i])):
+                    feed_dict={x: [testBatch['teX'][i][p]],
+                                    x_len: [len(testBatch['teX'][i][p])],
+                                    q: [testBatch['teXq'][i]],
+                                    q_len: [len(testBatch['teXq'][i])],
+                                    y_begin: [0],
+                                    y_end: [0],
                                     keep_prob: 1.0}
-                    begin, end = sess.run([prediction_begin, prediction_end], feed_dict=feed_dict)
+                    begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end, 
+                                                                prediction_begin_prob, prediction_end_prob,
+                                                                softmax_begin, softmax_end], feed_dict=feed_dict)
+                    start_score = testBatch['teXPassWeights'][i][p] * begin_prob[0]
+                    if start_score > max_start_score:
+                        max_start_score = start_score
+                        start_idx = begin[0]
+                        end_idx = end[0]
+                        passage_idx = p
 
+                    logits_start.append(lb[0].tolist())
+                    logits_end.append(le[0].tolist())
+                    #print(begin, end, begin_prob, end_prob)
+            
+                teContext.append(testBatch['teContext'][i][passage_idx])
+                teQuestionID.append(testBatch['teQuestionID'][i])
+                predictedBegin.append(start_idx)
+                predictedEnd.append(end_idx)
+                relevanceWeights.append(testBatch['teXPassWeights'][i])
+                logitsStart.append(logits_start)
+                logitsEnd.append(logits_end)
 
-
-
-            for j in range(len(begin)):
-                vContext.append(testBatch['teContext'][j])
-                vQuestionID.append(testBatch['teQuestionID'][j])
-                predictedBegin.append(begin[j])
-                predictedEnd.append(end[j])
 
                 # begin_corr += int(begin[j] == testBatch['teYBegin'][j])
                 # end_corr += int(end[j] == testBatch['teYEnd'][j])
@@ -201,7 +225,7 @@ def main():
         # print('begin accuracy: {}'.format(float(begin_corr) / total))
         # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEval(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd)
+        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd)
 
 if __name__ == "__main__":
     main()
