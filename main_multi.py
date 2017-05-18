@@ -4,9 +4,12 @@ from tqdm import tqdm
 import os
 import sys
 
-import bidaf_model_multi
+import baseline_model
+import attention_model
+import coattention_model
+import bidaf_model
 
-from data_multi import Data
+from data import Data
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -20,7 +23,8 @@ def get_parser():
     parser.add_argument('--batch_size', '-b', type=int, default=256)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.01)
     parser.add_argument('--load_model', '-l', type=int, default=0)
-    parser.add_argument('--model', '-m', default='bidaf', choices=['bidaf'])
+    parser.add_argument('--model', '-m', default='baseline',
+                        choices=['baseline', 'attention', 'coattention', 'bidaf'])
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--cell', '-c', default='lstm')
     parser.add_argument('--highway_network', '-hwn', type=int, default=1)
@@ -32,6 +36,7 @@ def main():
     config = parser.parse_args()
     config.train_path = '{}{}.json'.format('./datasets/msmarco/train/', config.question_type)
     config.val_path = '{}{}.json'.format('./datasets/msmarco/dev/', config.question_type)
+    config.test_path = '{}{}.json'.format('./datasets/msmarco/test/', config.question_type)
 
     load_model = config.load_model
 
@@ -39,7 +44,19 @@ def main():
 
     data = Data(config)
     
-    model = bidaf_model_multi.Model(config, data.max_context_size, data.max_ques_size)
+    if config.model == 'baseline':
+        model = baseline_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using baseline model")
+    elif config.model == 'attention':
+        model = attention_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using attention model")
+    elif config.model == 'coattention':
+        model = coattention_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using coattention model")
+    elif config.model == 'linked_outputs':
+        model = linked_outputs.Model(config, data.max_context_size, data.max_ques_size)
+    elif config.model == 'bidaf':
+        model = bidaf_model.Model(config, data.max_context_size, data.max_ques_size)
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
@@ -52,7 +69,6 @@ def main():
 
     # Placeholdes for model
     x = tf.placeholder(tf.int32, shape=[None, data.tX[0].shape[0]], name='x')
-    x_weights = tf.placeholder(tf.float32, shape=[None, data.max_passages], name='x_weights')
     x_len = tf.placeholder(tf.int32, shape=[None], name='x_len')
     q = tf.placeholder(tf.int32, shape=[None, data.max_ques_size], name='q')
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
@@ -62,7 +78,7 @@ def main():
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    model.build(x, x_weights, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
+    model.build(x, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
 
     print('Computation graph completed.')
 
@@ -70,6 +86,7 @@ def main():
 
     number_of_train_batches = data.getNumTrainBatches()
     number_of_val_batches = data.getNumValBatches()
+    number_of_test_batches = data.getNumTestBatches()
 
     # For tensorboard
     train_writer = tf.summary.FileWriter(tensorboard_path + '/train')
@@ -92,7 +109,6 @@ def main():
                     trainBatch = data.getRandomTrainBatch()
 
                     feed_dict={x: trainBatch['tX'],
-                                x_weights: trainBatch['tXPassWeights'],
                                 x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                                 q: trainBatch['tXq'],
                                 q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
@@ -103,7 +119,6 @@ def main():
 
                 # Record results for tensorboard, once per epoch
                 feed_dict={x: trainBatch['tX'],
-                        x_weights: trainBatch['tXPassWeights'],
                         x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
                         q: trainBatch['tXq'],
                         q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
@@ -114,7 +129,6 @@ def main():
 
                 valBatch = data.getRandomValBatch()
                 feed_dict={x: valBatch['vX'],
-                        x_weights: valBatch['vXPassWeights'],
                         x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
                         q: valBatch['vXq'],
                         q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
@@ -138,56 +152,56 @@ def main():
             sys.exit()
 
         # Print out answers for one of the batches
-        vContext = []
-        vQuestionID = []
+        teContext = []
+        teQuestionID = []
         predictedBegin = []
         predictedEnd = []
-        trueBegin = []
-        trueEnd = []
 
         begin_corr = 0
         end_corr = 0
         total = 0
 
-        for i in range(number_of_val_batches):
-            valBatch = data.getValBatch()
+        for i in range(number_of_test_batches):
+            testBatch = data.getTestBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
             prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
 
+            print(testBatch)
 
-            feed_dict={x: valBatch['vX'],
-                            x_weights: valBatch['vXPassWeights'],
-                            x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
-                            q: valBatch['vXq'],
-                            q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
-                            y_begin: valBatch['vYBegin'],
-                            y_end: valBatch['vYEnd'],
-                            keep_prob: 1.0}
-            begin, end = sess.run([prediction_begin, prediction_end], feed_dict=feed_dict)
+            for b in testBatch:
+                for p in b['teX']:
+                    feed_dict={x: [p],
+                                    x_len: [len(p)],
+                                    q: [b['teXq']],
+                                    q_len: [len(b['teXq'])],
+                                    y_begin: testBatch['teYBegin'],
+                                    y_end: testBatch['teYEnd'],
+                                    keep_prob: 1.0}
+                    begin, end = sess.run([prediction_begin, prediction_end], feed_dict=feed_dict)
+
+
 
 
             for j in range(len(begin)):
-                vContext.append(valBatch['vContext'][j])
-                vQuestionID.append(valBatch['vQuestionID'][j])
+                vContext.append(testBatch['teContext'][j])
+                vQuestionID.append(testBatch['teQuestionID'][j])
                 predictedBegin.append(begin[j])
                 predictedEnd.append(end[j])
-                trueBegin.append(valBatch['vYBegin'][j])
-                trueEnd.append(valBatch['vYEnd'][j])
 
-                begin_corr += int(begin[j] == valBatch['vYBegin'][j])
-                end_corr += int(end[j] == valBatch['vYEnd'][j])
-                total += 1
+                # begin_corr += int(begin[j] == testBatch['teYBegin'][j])
+                # end_corr += int(end[j] == testBatch['teYEnd'][j])
+                # total += 1
 
                 #print(batch['vQuestion'][j])
                 #print(batch['vContext'][j][begin[j] : end[j] + 1])
                 #print()
 
-        print('Validation Data:')
-        print('begin accuracy: {}'.format(float(begin_corr) / total))
-        print('end accuracy: {}'.format(float(end_corr) / total))
+        # print('Validation Data:')
+        # print('begin accuracy: {}'.format(float(begin_corr) / total))
+        # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEval(config.question_type, config.tensorboard_name, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
+        data.saveAnswersForEval(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd)
 
 if __name__ == "__main__":
     main()
