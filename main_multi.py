@@ -166,8 +166,7 @@ def main():
         total = 0
 
         print('Getting test data answers')
-        for i in range(1):
-        #for i in range(number_of_test_batches):
+        for i in range(number_of_test_batches):
             testBatch = data.getTestBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
@@ -210,6 +209,7 @@ def main():
                 tePassageIndex.append(passage_idx)
                 teContext.append(testBatch['teContext'][i])
                 teQuestionID.append(testBatch['teQuestionID'][i])
+                teUrl.append(testBatch['teUrl'][i])
                 predictedBegin.append(start_idx)
                 predictedEnd.append(end_idx)
                 relevanceWeights.append(testBatch['teXPassWeights'][i])
@@ -229,7 +229,8 @@ def main():
         # print('begin accuracy: {}'.format(float(begin_corr) / total))
         # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd, tePassageIndex)
+        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, teUrl, 
+        predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd, tePassageIndex)
 
 if __name__ == "__main__":
     main()
