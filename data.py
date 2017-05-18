@@ -32,7 +32,7 @@ class Data:
         # load test data, parse, and split
         print('Loading in testing data...')
         testData = self.importMsmarco(config.test_path)
-        self.teContext, self.teQuestion, self.teQuestionID, \
+        self.teContext, self.teQuestion, self.teQuestionID, self.teUrls, \
             self.maxLenTeContext, self.maxLenTeQuestion = self.splitMsmarcoDatasetsTest(testData)
 
         print('Building vocabulary...')
@@ -86,12 +86,10 @@ class Data:
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
         self.vContext = np.array(self.vContext, dtype=object)
-        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
 
         self.teX = np.array(self.teX)
         self.teXq = np.array(self.teXq)
         self.teContext = np.array(self.teContext, dtype=object)
-        self.teQuestionID = np.array(self.teQuestionID, dtype=object)
         self.tePassWeights = np.array(self.tePassWeights)
 
     def getNumTrainBatches(self):
@@ -155,6 +153,7 @@ class Data:
         teQuestionID_batch = self.teQuestionID[points]
         teX_batch = self.teX[points]
         teXq_batch = self.teXq[points]
+        teUrl_batch = self.teUrls[points]
         teXPassWeights_batch = self.tePassWeights[points]
 
         self.testBatchNum += 1
@@ -163,7 +162,7 @@ class Data:
             self.testBatchNum = 0
 
         return {'teContext': teContext_batch, 'teQuestionID': teQuestionID_batch,
-                'teX': teX_batch, 'teXq': teXq_batch,
+                'teX': teX_batch, 'teXq': teXq_batch, 'teUrl': teUrl_batch,
                 'teXPassWeights': teXPassWeights_batch}
 
     def loadGloveModel(self, gloveFile):
@@ -279,17 +278,20 @@ class Data:
         xContext = [] # list of list of contexts paragraphs
         xQuestion = [] # list of questions
         xQuestionID = [] # list of question id
+        xUrls = [] # list of list of urls associated with the passages
         maxLenContext = 0
         maxLenQuestion = 0
 
         for data in f['data']:
             passages = []
+            urls = []
 
             for passage in data['passages']:
                 context = passage['passage_text']
                 contextTokenized = self.tokenize(context.lower())
 
                 passages.append(contextTokenized)
+                urls.append(passage['url'])
 
                 contextLength = len(contextTokenized)
                 if contextLength > maxLenContext:
@@ -305,8 +307,9 @@ class Data:
             xContext.append(passages)
             xQuestion.append(questionTokenized)
             xQuestionID.append(questionID)
+            xUrls(urls)
 
-        return xContext, xQuestion, xQuestionID, maxLenContext, maxLenQuestion
+        return xContext, xQuestion, xQuestionID, xUrls, maxLenContext, maxLenQuestion
 
 
     def findAnswer(self, contextTokenized, answerTokenized):
@@ -416,7 +419,7 @@ class Data:
 
         cf.close()
 
-    def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd):
+    def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd):
         can_fn = './candidates_multi/' + candidateName + '.json'
 
         cf = open(can_fn, 'w', encoding='utf-8')

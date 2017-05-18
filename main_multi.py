@@ -206,6 +206,7 @@ def main():
             
                 teContext.append(testBatch['teContext'][i][passage_idx])
                 teQuestionID.append(testBatch['teQuestionID'][i])
+                teUrl.append(testBatch['teUrl'][i])
                 predictedBegin.append(start_idx)
                 predictedEnd.append(end_idx)
                 relevanceWeights.append(testBatch['teXPassWeights'][i])
@@ -225,7 +226,8 @@ def main():
         # print('begin accuracy: {}'.format(float(begin_corr) / total))
         # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd)
+        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, teUrl,
+        predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd)
 
 if __name__ == "__main__":
     main()
