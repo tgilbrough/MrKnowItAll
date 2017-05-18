@@ -307,7 +307,7 @@ class Data:
             xContext.append(passages)
             xQuestion.append(questionTokenized)
             xQuestionID.append(questionID)
-            xUrls(urls)
+            xUrls.append(urls)
 
         return xContext, xQuestion, xQuestionID, xUrls, maxLenContext, maxLenQuestion
 
