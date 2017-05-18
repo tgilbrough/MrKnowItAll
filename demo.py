@@ -64,13 +64,14 @@ def _main():
         y_end = graph.get_tensor_by_name('y_end:0')
         keep_prob = graph.get_tensor_by_name('keep_prob:0')
 
+        # don't need numpy
         feed_dict = {
             x: np.array([context], dtype=np.int32),
             x_len: [len(context)],
             q: np.array([question], dtype=np.int32),
             q_len: [len(question)],
-            y_begin: [1],
-            y_end: [2],
+            y_begin: [0],
+            y_end: [0],
             keep_prob: 1.0
         }
 

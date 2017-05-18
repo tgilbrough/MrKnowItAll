@@ -37,7 +37,7 @@ class Data:
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
-        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion 
+        vocab = self.buildVocab(self.tContext + self.tQuestion + self.vContext + self.vQuestion
                                 + [t for p in self.teContext for t in p] + self.teQuestion)
         self.vocab = vocab
 
@@ -368,14 +368,14 @@ class Data:
 
             tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
-            
+
             # Normalize
             # cosine_similarities = [math.exp(x) for x in cosine_similarities]
             sum_cs = sum(cosine_similarities)
             cosine_similarities = [x / sum_cs for x in cosine_similarities]
 
             cs.append(cosine_similarities)
-        
+
         return cs
 
     def saveAnswersForEvalVal(self, questionType, candidateName, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
@@ -419,24 +419,38 @@ class Data:
 
         cf.close()
 
-    def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd):
-        can_fn = './candidates_multi/' + candidateName + '.json'
+    def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd, tePassageIndex):
+        ANSWER_DIR = 'answers'
 
-        cf = open(can_fn, 'w', encoding='utf-8')
+        if not os.path.exists(ANSWER_DIR):
+            os.makedirs(ANSWER_DIR)
 
-        for i in range(len(teContext)):
-            predictedAnswer = ' '.join(teContext[i][predictedBegin[i] : predictedEnd[i] + 1])
+        for query_index in range(len(teContext)):
+            query_id = teQuestionID[query_index]
 
-            candidate = {}
-            candidate['query_id'] = teQuestionID[i]
-            candidate['answers'] = [predictedAnswer]
-            candidate['relevance'] = passageWeights[i]
-            candidate['logits_start'] = logitsStart[i]
-            candidate['logits_end'] = logitsEnd[i]
+            def get_passage(passage_index):
+                return {
+                    'tokens': teContext[query_index][passage_index],
+                    'relevance': passageWeights[query_index][passage_index],
+                    'logits_start': logitsEnd[query_index][passage_index],
+                    'logits_end': logitsStart[query_index][passage_index],
+                    'url': teUrl[query_id][passage_index],
+                }
 
-            print(json.dumps(candidate, ensure_ascii=False), file=cf)
+            with open('{}/{}.json'.format(ANSWER_DIR, query_id), 'w+') as out:
+                passages = [get_passage(i)
+                            for i in range(len(teContext[query_index]))]
+                passages.sort(key=lambda p: p['relevance'], reverse=True)
 
-        cf.close()
+                candidate = {
+                    'query_id': query_id,
+                    'passages': passages,
+                    'start_index': predictedBegin[query_index].item(),
+                    'end_index': predictedEnd[query_index].item(),
+                    'passage_index': tePassageIndex[query_index]
+                }
+
+                json.dump(candidate, out, ensure_ascii=False)
 
     def importMsmarco(self, json_file):
         data = {}
