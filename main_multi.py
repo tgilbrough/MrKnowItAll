@@ -167,8 +167,7 @@ def main():
         total = 0
 
         print('Getting test data answers')
-        for i in range(1):
-        # for i in range(number_of_test_batches):
+        for i in range(number_of_test_batches):
             testBatch = data.getTestBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
