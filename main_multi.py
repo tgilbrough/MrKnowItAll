@@ -160,6 +160,7 @@ def main():
         logitsStart = []
         logitsEnd = []
         tePassageIndex = []
+        teUrl = []
 
         begin_corr = 0
         end_corr = 0
@@ -229,7 +230,7 @@ def main():
         # print('begin accuracy: {}'.format(float(begin_corr) / total))
         # print('end accuracy: {}'.format(float(end_corr) / total))
 
-        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, teUrl, 
+        data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, teUrl,
         predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd, tePassageIndex)
 
 if __name__ == "__main__":

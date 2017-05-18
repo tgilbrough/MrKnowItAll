@@ -86,11 +86,14 @@ class Data:
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
         self.vContext = np.array(self.vContext, dtype=object)
+        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
 
         self.teX = np.array(self.teX)
         self.teXq = np.array(self.teXq)
         self.teContext = np.array(self.teContext, dtype=object)
+        self.teQuestionID = np.array(self.teQuestionID, dtype=object)
         self.tePassWeights = np.array(self.tePassWeights)
+        self.teUrls = np.array(self.teUrls, dtype=object)
 
     def getNumTrainBatches(self):
         return int(math.ceil(len(self.tX) / self.batch_size))
