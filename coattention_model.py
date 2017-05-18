@@ -10,8 +10,6 @@ class Model:
         self.model_name = 'coattention'
         self.emb_size = config.emb_size
         self.hidden_size = config.hidden_size
-        self.pool_size = config.pool_size
-        self.max_decode_steps = config.max_decode_steps
         self.max_x = max_x
         self.max_q = max_q
         self.saver = None
@@ -88,12 +86,19 @@ class Model:
             loss1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_begin, logits=alpha), name='beginning_loss')
             loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=beta), name='ending_loss')
             loss = loss1 + loss2
+        with tf.variable_scope('accuracy'):
+            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits_start, 1), 'int32')), 'float'), name='beginning_accuracy')
+            acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits_end, 1), 'int32')), 'float'), name='ending_accuracy')
 
         self.loss = loss
         # self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
 
-        tf.summary.scalar('loss', self.loss)
-
+        tf.summary.scalar('loss', loss)
+        tf.summary.scalar('loss1', loss1)
+        tf.summary.scalar('loss2', loss2)
+        tf.summary.scalar('accuracy1', acc1)
+        tf.summary.scalar('accuracy2', acc2)
+        
         self.logits1 = alpha
         self.logits2 = beta
         
