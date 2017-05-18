@@ -437,7 +437,7 @@ class Data:
                     'relevance': passageWeights[query_index][passage_index],
                     'logits_start': logitsEnd[query_index][passage_index],
                     'logits_end': logitsStart[query_index][passage_index],
-                    'url': teUrl[query_id][passage_index],
+                    'url': teUrl[query_index][passage_index],
                 }
 
             with open('{}/{}.json'.format(ANSWER_DIR, query_id), 'w+') as out:
