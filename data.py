@@ -443,7 +443,7 @@ class Data:
             with open('{}/{}.json'.format(ANSWER_DIR, query_id), 'w+') as out:
                 passages = [get_passage(i)
                             for i in range(len(teContext[query_index]))]
-                passages.sort(key=lambda p: p['relevance'], reverse=True)
+                # passages.sort(key=lambda p: p['relevance'], reverse=True)
 
                 candidate = {
                     'query_id': query_id,
