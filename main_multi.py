@@ -151,6 +151,81 @@ def main():
             print('Must train model first with --train flag')
             sys.exit()
 
+        vContext = []
+        vQuestionID = []
+        vPassagePred = []
+        predictedBegin = []
+        predictedEnd = []
+        trueBegin = []
+        trueEnd = []
+
+        begin_corr = 0
+        end_corr = 0
+        total = 0
+
+        print('Getting val data answers')
+        for i in range(number_of_val_batches):
+            valBatch = data.getValBatch()
+
+            prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
+            prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
+            prediction_begin_prob = tf.reduce_max(tf.nn.softmax(model.logits1), 1)
+            prediction_end_prob = tf.reduce_max(tf.nn.softmax(model.logits2), 1)
+
+            for i in range(len(valBatch['vXq'])):
+                max_start_score = 0.0
+                passage_idx = 0
+                start_idx = 0
+                end_idx = 0
+                for p in range(len(valBatch['vmX'][i])):
+                    feed_dict={x: [valBatch['vmX'][i][p]],
+                                    x_len: [len(valBatch['vmX'][i][p])],
+                                    q: [valBatch['vXq'][i]],
+                                    q_len: [len(valBatch['vXq'][i])],
+                                    y_begin: [0],
+                                    y_end: [0],
+                                    keep_prob: 1.0}
+                    begin, end, begin_prob, end_prob = sess.run([prediction_begin, prediction_end,
+                                                                prediction_begin_prob, prediction_end_prob], feed_dict=feed_dict)
+                    
+                    start_score = valBatch['vXPassWeight'][i][p] * begin_prob[0]
+                    if start_score > max_start_score:
+                        max_start_score = start_score
+                        start_idx = begin[0]
+                        end_idx = end[0]
+                        passage_idx = p
+
+                    #print(begin, end, begin_prob, end_prob)
+
+                vContext.append(valBatch['vContext'][i])
+                vPassagePred.append(valBatch['vmContext'][i][passage_idx])
+                vQuestionID.append(valBatch['vQuestionID'][i])
+                predictedBegin.append(start_idx)
+                predictedEnd.append(end_idx)
+                trueBegin.append(valBatch['vYBegin'][i])
+                trueEnd.append(valBatch['vYEnd'][i])
+
+
+
+                # begin_corr += int(begin[j] == testBatch['teYBegin'][j])
+                # end_corr += int(end[j] == testBatch['teYEnd'][j])
+                # total += 1
+
+                #print(batch['vQuestion'][j])
+                #print(batch['vContext'][j][begin[j] : end[j] + 1])
+                #print()
+
+        # print('Validation Data:')
+        # print('begin accuracy: {}'.format(float(begin_corr) / total))
+        # print('end accuracy: {}'.format(float(end_corr) / total))
+
+        data.saveAnswersForEvalVal(config.question_type, config.tensorboard_name, vContext, vPassagePred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
+
+
+
+
+        ####### FOR DEMO ####### 
+
         # Print out answers for one of the batches
         teContext = []
         teQuestionID = []
@@ -195,7 +270,7 @@ def main():
                     begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob,
                                                                 softmax_begin, softmax_end], feed_dict=feed_dict)
-                    start_score = testBatch['teXPassWeights'][i][p] * begin_prob[0]
+                    start_score = testBatch['teXPassWeight'][i][p] * begin_prob[0]
                     if start_score > max_start_score:
                         max_start_score = start_score
                         start_idx = begin[0]
@@ -212,7 +287,7 @@ def main():
                 teQuestionID.append(testBatch['teQuestionID'][i])
                 predictedBegin.append(start_idx)
                 predictedEnd.append(end_idx)
-                relevanceWeights.append(testBatch['teXPassWeights'][i])
+                relevanceWeights.append(testBatch['teXPassWeight'][i])
                 logitsStart.append(logits_start)
                 logitsEnd.append(logits_end)
                 teUrl.append(testBatch['teUrl'][i])
