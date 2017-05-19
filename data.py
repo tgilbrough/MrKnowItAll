@@ -423,7 +423,7 @@ class Data:
         cf.close()
 
     def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd, tePassageIndex):
-        ANSWER_DIR = 'answers'
+        ANSWER_DIR = '../cse481n-blog/demo/data/answers'
 
         if not os.path.exists(ANSWER_DIR):
             os.makedirs(ANSWER_DIR)
