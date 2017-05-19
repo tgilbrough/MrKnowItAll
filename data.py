@@ -20,17 +20,17 @@ class Data:
         # load training data, parse, and split
         print('Loading in training data...')
         trainData = self.importMsmarco(config.train_path)
-        self.tContext, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
+        self.tContext, self.tXLen, self.tQuestion, self.tQuestionID, self.tAnswerBegin, self.tAnswerEnd, self.tAnswerText, \
             self.maxLenTContext, self.maxLenTQuestion = self.splitMsmarcoDatasets(trainData)
 
         # load validation data, parse, and split
         print('Loading in validation data...')
         valData = self.importMsmarco(config.val_path)
-        self.vContext, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
+        self.vContext, self.vXLen, self.vQuestion, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
             self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
         # For the validation data snag the multiple passages
-        self.vmContext, self.maxLenVmContext = self.splitMsmarcoDatasetsValMulti(valData)
+        self.vmContext, self.vmXLen, self.maxLenVmContext = self.splitMsmarcoDatasetsValMulti(valData)
 
         # load test data, parse, and split
         print('Loading in testing data...')
@@ -86,18 +86,20 @@ class Data:
 
     def convertToNumpy(self):
         self.tX = np.array(self.tX)
+        self.tXLen = np.array(self.tXLen)
         self.tXq = np.array(self.tXq)
         self.tYBegin = np.array(self.tYBegin)
         self.tYEnd = np.array(self.tYEnd)
 
         self.vX = np.array(self.vX)
+        self.vXLen = np.array(self.vXLen)
         self.vmX = np.array(self.vmX)
+        self.vmXLen = np.array(self.vmXLen)
         self.vXq = np.array(self.vXq)
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
         self.vContext = np.array(self.vContext, dtype=object)
         self.vmContext = np.array(self.vmContext, dtype=object)
-        self.vmX = np.array(self.vmX)
         self.vQuestionID = np.array(self.vQuestionID, dtype=object)
         self.vPassWeight = np.array(self.vPassWeight)
 
@@ -122,22 +124,24 @@ class Data:
         points = np.random.choice(len(self.tX), self.batch_size)
 
         tX_batch = self.tX[points]
+        tXLen_batch = self.tXLen[points]
         tXq_batch = self.tXq[points]
         tYBegin_batch = self.tYBegin[points]
         tYEnd_batch = self.tYEnd[points]
 
-        return {'tX': tX_batch, 'tXq': tXq_batch,
+        return {'tX': tX_batch, 'tXLen': tXLen_batch, 'tXq': tXq_batch,
                 'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
 
     def getRandomValBatch(self):
         points = np.random.choice(len(self.vX), self.batch_size)
 
         vX_batch = self.vX[points]
+        vXLen_batch = self.vXLen[points]
         vXq_batch = self.vXq[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
 
-        return {'vX': vX_batch, 'vXq': vXq_batch,
+        return {'vX': vX_batch, 'vXLen': vXLen_batch, 'vXq': vXq_batch,
                 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def getValBatch(self):
@@ -150,6 +154,7 @@ class Data:
         vQuestionID_batch = self.vQuestionID[points]
         vX_batch = self.vX[points]
         vmX_batch = self.vmX[points]
+        vmXLen_batch = self.vmXLen[points]
         vXq_batch = self.vXq[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
@@ -161,7 +166,7 @@ class Data:
             self.valBatchNum = 0
 
         return {'vContext': vContext_batch, 'vmContext': vmContext_batch, 'vQuestionID': vQuestionID_batch,
-                'vX': vX_batch, 'vmX': vmX_batch, 'vXq': vXq_batch,
+                'vX': vX_batch, 'vmX': vmX_batch, 'vmXLen': vmXLen_batch, 'vXq': vXq_batch,
                 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch,
                 'vXPassWeight': vXPassWeights_batch}
 
@@ -242,6 +247,7 @@ class Data:
         xAnswerBegin = [] # list of indices of the beginning word in each answer span
         xAnswerEnd = [] # list of indices of the ending word in each answer span
         xAnswerText = [] # list of the answer text
+        xLen = [] # list of unpadded lengths
         maxLenContext = 0
         maxLenQuestion = 0
 
@@ -279,6 +285,7 @@ class Data:
                         xAnswerBegin.append(answerBeginIndex)
                         xAnswerEnd.append(answerEndIndex)
                         xAnswerText.append(answer)
+                        xLen.append(len(contextTokenized))
                         answerFound = True
                         break
 
@@ -286,17 +293,19 @@ class Data:
                     answerFound = False
                     break
 
-        return xContext, xQuestion, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
+        return xContext, xLen, xQuestion, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
 
     def splitMsmarcoDatasetsValMulti(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
            and keep track of max context and question lengths.
         '''
         xContext = [] # list of list of contexts paragraphs
+        xmLen = [] # list of list of unpadded lengths
         maxLenContext = 0
 
         for data in f['data']:
             passages = []
+            x_len = []
 
             answerFound = False
             for passage in data['passages']:
@@ -304,6 +313,7 @@ class Data:
                 contextTokenized = self.tokenize(context.lower())
 
                 passages.append(contextTokenized)
+                x_len.append(len(contextTokenized))
 
                 contextLength = len(contextTokenized)
                 if contextLength > maxLenContext:
@@ -320,8 +330,9 @@ class Data:
 
             if answerFound:
                 xContext.append(passages)
+                xmLen.append(x_len)
 
-        return xContext, maxLenContext
+        return xContext, xmLen, maxLenContext
 
     def splitMsmarcoDatasetsTest(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
@@ -422,7 +433,6 @@ class Data:
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
 
             # Normalize
-            # cosine_similarities = [math.exp(x) for x in cosine_similarities]
             sum_cs = sum(cosine_similarities)
             cosine_similarities = [x / sum_cs for x in cosine_similarities]
 
@@ -486,7 +496,7 @@ class Data:
 
                 candidate = {
                     'query_id': query_id,
-                    'passages': passages
+                    'passages': passages,
                 }
 
                 json.dump(candidate, out, ensure_ascii=False)

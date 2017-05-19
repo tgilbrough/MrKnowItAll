@@ -109,7 +109,7 @@ def main():
                     trainBatch = data.getRandomTrainBatch()
 
                     feed_dict={x: trainBatch['tX'],
-                                x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                                x_len: trainBatch['tXLen'],
                                 q: trainBatch['tXq'],
                                 q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
                                 y_begin: trainBatch['tYBegin'],
@@ -119,7 +119,7 @@ def main():
 
                 # Record results for tensorboard, once per epoch
                 feed_dict={x: trainBatch['tX'],
-                        x_len: [len(trainBatch['tX'][i]) for i in range(len(trainBatch['tX']))],
+                        x_len: trainBatch['tXLen'],
                         q: trainBatch['tXq'],
                         q_len: [len(trainBatch['tXq'][i]) for i in range(len(trainBatch['tXq']))],
                         y_begin: trainBatch['tYBegin'],
@@ -129,7 +129,7 @@ def main():
 
                 valBatch = data.getRandomValBatch()
                 feed_dict={x: valBatch['vX'],
-                        x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
+                        x_len: valBatch['vXLen'],
                         q: valBatch['vXq'],
                         q_len: [len(valBatch['vXq'][i]) for i in range(len(valBatch['vXq']))],
                         y_begin: valBatch['vYBegin'],
@@ -179,7 +179,7 @@ def main():
                 end_idx = 0
                 for p in range(len(valBatch['vmX'][i])):
                     feed_dict={x: [valBatch['vmX'][i][p]],
-                                    x_len: [len(valBatch['vmX'][i][p])],
+                                    x_len: [valBatch['vmXLen'][i][p]],
                                     q: [valBatch['vXq'][i]],
                                     q_len: [len(valBatch['vXq'][i])],
                                     y_begin: [0],
@@ -188,14 +188,12 @@ def main():
                     begin, end, begin_prob, end_prob = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob], feed_dict=feed_dict)
                     
-                    start_score = valBatch['vXPassWeight'][i][p] * begin_prob[0]
+                    start_score = valBatch['vXPassWeight'][i][p] * begin_prob[0] * end_prob[0]
                     if start_score > max_start_score:
                         max_start_score = start_score
                         start_idx = begin[0]
                         end_idx = end[0]
                         passage_idx = p
-
-                    #print(begin, end, begin_prob, end_prob)
 
                 vContext.append(valBatch['vContext'][i])
                 vPassagePred.append(valBatch['vmContext'][i][passage_idx])
@@ -205,23 +203,7 @@ def main():
                 trueBegin.append(valBatch['vYBegin'][i])
                 trueEnd.append(valBatch['vYEnd'][i])
 
-
-
-                # begin_corr += int(begin[j] == testBatch['teYBegin'][j])
-                # end_corr += int(end[j] == testBatch['teYEnd'][j])
-                # total += 1
-
-                #print(batch['vQuestion'][j])
-                #print(batch['vContext'][j][begin[j] : end[j] + 1])
-                #print()
-
-        # print('Validation Data:')
-        # print('begin accuracy: {}'.format(float(begin_corr) / total))
-        # print('end accuracy: {}'.format(float(end_corr) / total))
-
         data.saveAnswersForEvalVal(config.question_type, config.tensorboard_name, vContext, vPassagePred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
-
-
 
 
         ####### FOR DEMO ####### 
@@ -279,7 +261,6 @@ def main():
 
                     logits_start.append(lb[0].tolist())
                     logits_end.append(le[0].tolist())
-                    #print(begin, end, begin_prob, end_prob)
 
 
                 tePassageIndex.append(passage_idx)
@@ -291,19 +272,6 @@ def main():
                 logitsStart.append(logits_start)
                 logitsEnd.append(logits_end)
                 teUrl.append(testBatch['teUrl'][i])
-
-
-                # begin_corr += int(begin[j] == testBatch['teYBegin'][j])
-                # end_corr += int(end[j] == testBatch['teYEnd'][j])
-                # total += 1
-
-                #print(batch['vQuestion'][j])
-                #print(batch['vContext'][j][begin[j] : end[j] + 1])
-                #print()
-
-        # print('Validation Data:')
-        # print('begin accuracy: {}'.format(float(begin_corr) / total))
-        # print('end accuracy: {}'.format(float(end_corr) / total))
 
         data.saveAnswersForEvalTestDemo(config.question_type, config.tensorboard_name, teContext, teQuestionID, teUrl,
         predictedBegin, predictedEnd, relevanceWeights, logitsStart, logitsEnd, tePassageIndex)
