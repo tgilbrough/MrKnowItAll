@@ -108,6 +108,7 @@ class Data:
         self.tePassWeight = np.array(self.tePassWeight)
         self.teUrl = np.array(self.teUrl, dtype=object)
 
+
     def getNumTrainBatches(self):
         return int(math.ceil(len(self.tX) / self.batch_size))
 
@@ -455,7 +456,7 @@ class Data:
         cf.close()
 
     def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd, tePassageIndex):
-        ANSWER_DIR = 'answers'
+        ANSWER_DIR = '../cse481n-blog/demo/data/answers'
 
         if not os.path.exists(ANSWER_DIR):
             os.makedirs(ANSWER_DIR)
@@ -467,22 +468,26 @@ class Data:
                 return {
                     'tokens': teContext[query_index][passage_index],
                     'relevance': passageWeights[query_index][passage_index],
-                    'logits_start': logitsEnd[query_index][passage_index],
-                    'logits_end': logitsStart[query_index][passage_index],
+                    'logits_start': logitsStart[query_index][passage_index],
+                    'logits_end': logitsEnd[query_index][passage_index],
                     'url': teUrl[query_index][passage_index],
                 }
 
             with open('{}/{}.json'.format(ANSWER_DIR, query_id), 'w+') as out:
                 passages = [get_passage(i)
                             for i in range(len(teContext[query_index]))]
+
+                selected_passage = passages[tePassageIndex[query_index]]
+                selected_passage['selected'] = True
+                selected_passage['start_index'] = predictedBegin[query_index].item()
+                selected_passage['end_index'] = predictedEnd[query_index].item()
+
                 passages.sort(key=lambda p: p['relevance'], reverse=True)
 
                 candidate = {
                     'query_id': query_id,
                     'passages': passages,
-                    'start_index': predictedBegin[query_index].item(),
-                    'end_index': predictedEnd[query_index].item(),
-                    'passage_index': tePassageIndex[query_index]
+                    'answer': predictedAnswer
                 }
 
                 json.dump(candidate, out, ensure_ascii=False)
