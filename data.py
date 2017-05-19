@@ -451,8 +451,6 @@ class Data:
 
                 passages.sort(key=lambda p: p['relevance'], reverse=True)
 
-                predictedAnswer = ' '.join(teContext[i][predictedBegin[i] : predictedEnd[i] + 1])
-
                 candidate = {
                     'query_id': query_id,
                     'passages': passages,
