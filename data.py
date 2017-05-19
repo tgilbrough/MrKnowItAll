@@ -56,8 +56,8 @@ class Data:
         self.embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
 
         # Calculating passage relevance weights
-        self.vPassWeight = self.passageRevelevance(self.vmContext, self.vQuestion)
-        self.tePassWeight = self.passageRevelevance(self.temContext, self.teQuestion)
+        self.vmPassWeight = self.passageRevelevance(self.vmContext, self.vQuestion)
+        self.temPassWeight = self.passageRevelevance(self.temContext, self.teQuestion)
 
         # vectorize training and validation datasets
         print('Begin vectorizing process...')
@@ -104,7 +104,7 @@ class Data:
         self.vContext = np.array(self.vContext, dtype=object)
         self.vmContext = np.array(self.vmContext, dtype=object)
         self.vQuestionID = np.array(self.vQuestionID, dtype=object)
-        self.vPassWeight = np.array(self.vPassWeight)
+        self.vmPassWeight = np.array(self.vmPassWeight)
 
         self.temX = np.array(self.temX)
         self.temXLen = np.array(self.temXLen)
@@ -112,7 +112,7 @@ class Data:
         self.teXqLen = np.array(self.teXqLen)
         self.temContext = np.array(self.temContext, dtype=object)
         self.teQuestionID = np.array(self.teQuestionID, dtype=object)
-        self.tePassWeight = np.array(self.tePassWeight)
+        self.temPassWeight = np.array(self.temPassWeight)
         self.teUrl = np.array(self.teUrl, dtype=object)
 
 
@@ -165,7 +165,7 @@ class Data:
         vXqLen_batch = self.vXqLen[points]
         vYBegin_batch = self.vYBegin[points]
         vYEnd_batch = self.vYEnd[points]
-        vXPassWeights_batch = self.vPassWeight[points]
+        vmXPassWeights_batch = self.vmPassWeight[points]
 
         self.valBatchNum += 1
 
@@ -175,14 +175,14 @@ class Data:
         return {'vContext': vContext_batch, 'vmContext': vmContext_batch, 'vQuestionID': vQuestionID_batch,
                 'vX': vX_batch, 'vmX': vmX_batch, 'vmXLen': vmXLen_batch, 'vXq': vXq_batch, 'vXqLen': vXqLen_batch,
                 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch,
-                'vXPassWeight': vXPassWeights_batch}
+                'vmXPassWeight': vmXPassWeights_batch}
 
     def getTestBatch(self):
         start = self.testBatchNum * self.batch_size
         end = min(len(self.temX), (self.testBatchNum + 1) * self.batch_size)
         points = np.arange(start, end)
 
-        teContext_batch = self.teContext[points]
+        temContext_batch = self.temContext[points]
         teQuestionID_batch = self.teQuestionID[points]
         temX_batch = self.temX[points]
         temXLen_batch = self.temXLen[points]
@@ -196,7 +196,7 @@ class Data:
         if self.testBatchNum >= self.getNumTestBatches():
             self.testBatchNum = 0
 
-        return {'teContext': teContext_batch, 'teQuestionID': teQuestionID_batch,
+        return {'temContext': temContext_batch, 'teQuestionID': teQuestionID_batch,
                 'temX': temX_batch, 'temXLen': temXLen_batch, 'teXq': teXq_batch, 'teXqLen': teXqLen_batch,
                 'teUrl': teUrl_batch, 'temXPassWeight': temXPassWeight_batch}
 

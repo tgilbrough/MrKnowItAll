@@ -188,7 +188,7 @@ def main():
                     begin, end, begin_prob, end_prob = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob], feed_dict=feed_dict)
                     
-                    start_score = valBatch['vXPassWeight'][i][p] * begin_prob[0] * end_prob[0]
+                    start_score = valBatch['vmXPassWeight'][i][p] * begin_prob[0] * end_prob[0]
                     if start_score > max_start_score:
                         max_start_score = start_score
                         start_idx = begin[0]
@@ -241,18 +241,18 @@ def main():
                 end_idx = 0
                 logits_start = []
                 logits_end = []
-                for p in range(len(testBatch['teX'][i])):
-                    feed_dict={x: [testBatch['teX'][i][p]],
-                                    x_len: [len(testBatch['teX'][i][p])],
+                for p in range(len(testBatch['temX'][i])):
+                    feed_dict={x: [testBatch['temX'][i][p]],
+                                    x_len: [testBatch['temXLen'][i][p]],
                                     q: [testBatch['teXq'][i]],
-                                    q_len: [len(testBatch['teXq'][i])],
+                                    q_len: [testBatch['teXqLen'][i]],
                                     y_begin: [0],
                                     y_end: [0],
                                     keep_prob: 1.0}
                     begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob,
                                                                 softmax_begin, softmax_end], feed_dict=feed_dict)
-                    start_score = testBatch['teXPassWeight'][i][p] * begin_prob[0]
+                    start_score = testBatch['temXPassWeight'][i][p] * begin_prob[0]
                     if start_score > max_start_score:
                         max_start_score = start_score
                         start_idx = begin[0]
@@ -264,11 +264,11 @@ def main():
 
 
                 tePassageIndex.append(passage_idx)
-                teContext.append(testBatch['teContext'][i])
+                teContext.append(testBatch['temContext'][i])
                 teQuestionID.append(testBatch['teQuestionID'][i])
                 predictedBegin.append(start_idx)
                 predictedEnd.append(end_idx)
-                relevanceWeights.append(testBatch['teXPassWeight'][i])
+                relevanceWeights.append(testBatch['temXPassWeight'][i])
                 logitsStart.append(logits_start)
                 logitsEnd.append(logits_end)
                 teUrl.append(testBatch['teUrl'][i])
