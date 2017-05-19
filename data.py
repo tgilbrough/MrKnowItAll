@@ -435,8 +435,8 @@ class Data:
                 return {
                     'tokens': teContext[query_index][passage_index],
                     'relevance': passageWeights[query_index][passage_index],
-                    'logits_start': logitsEnd[query_index][passage_index],
-                    'logits_end': logitsStart[query_index][passage_index],
+                    'logits_start': logitsStart[query_index][passage_index],
+                    'logits_end': logitsEnd[query_index][passage_index],
                     'url': teUrl[query_index][passage_index],
                 }
 
