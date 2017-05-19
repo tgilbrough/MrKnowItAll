@@ -42,6 +42,7 @@ class Data:
         # build a vocabulary over all training and validation context paragraphs and question words
         vocab = self.buildVocab(self.tContext + self.tQuestion + [t for p in self.vmContext for t in p] + self.vQuestion
                                 + [t for p in self.temContext for t in p] + self.teQuestion)
+
         self.vocab = vocab
 
         # Reserve 0 for masking via pad_sequences
@@ -148,6 +149,7 @@ class Data:
 
         return {'vX': vX_batch, 'vXLen': vXLen_batch, 'vXq': vXq_batch,
                 'vXqLen':  vXqLen_batch, 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
+                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def getValBatch(self):
         start = self.valBatchNum * self.batch_size
@@ -303,7 +305,9 @@ class Data:
                     answerFound = False
                     break
 
+
         return xContext, xLen, xQuestion, qLen, xQuestionID, xAnswerBegin, xAnswerEnd, xAnswerText, maxLenContext, maxLenQuestion
+
 
     def splitMsmarcoDatasetsValMulti(self, f):
         '''Given a parsed Json data object, split the object into training context (paragraph), question, answer matrices,
@@ -450,7 +454,6 @@ class Data:
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
 
             # Normalize
-            # cosine_similarities = [math.exp(x) for x in cosine_similarities]
             sum_cs = sum(cosine_similarities)
             cosine_similarities = [x / sum_cs for x in cosine_similarities]
 

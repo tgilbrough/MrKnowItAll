@@ -87,8 +87,8 @@ class Model:
             loss2 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y_end, logits=beta), name='ending_loss')
             loss = loss1 + loss2
         with tf.variable_scope('accuracy'):
-            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(logits_start, 1), 'int32')), 'float'), name='beginning_accuracy')
-            acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(logits_end, 1), 'int32')), 'float'), name='ending_accuracy')
+            acc1 = tf.reduce_mean(tf.cast(tf.equal(y_begin, tf.cast(tf.argmax(alpha, 1), 'int32')), 'float'), name='beginning_accuracy')
+            acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(beta, 1), 'int32')), 'float'), name='ending_accuracy')
 
         self.loss = loss
         # self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
