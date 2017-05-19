@@ -23,21 +23,18 @@ class Model:
         with tf.variable_scope('embedding_question'):
             question = tf.nn.embedding_lookup(emb_mat, q, name='question')
 
-        with tf.variable_scope('encoding_context'):
-            gru_c_cell = GRUCell(self.dim)
-            gru_c_cell = DropoutWrapper(gru_c_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
+        cell = GRUCell(self.dim)
+        d_cell = DropoutWrapper(cell, input_keep_prob=keep_prob)  # to avoid over-fitting
 
-            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(gru_c_cell, gru_c_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
+        with tf.variable_scope('encoding_context'):
+            outputs_context, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=context, sequence_length=x_len, dtype=tf.float32)
             context_fw, context_bw = outputs_context
             context_output = tf.concat([context_fw, context_bw], axis=2)
             tf.summary.histogram('context_output', context_output)
 
-        with tf.variable_scope('encoding_question'):
-            gru_q_cell = GRUCell(self.dim)
-            gru_q_cell = DropoutWrapper(gru_q_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
-
-            # tf.get_variable_scope().reuse_variables()
-            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(gru_q_cell, gru_q_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
+        # with tf.variable_scope('encoding_question'):
+            tf.get_variable_scope().reuse_variables()
+            outputs_question, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=question, sequence_length=q_len, dtype=tf.float32)
             question_fw, question_bw = outputs_question
             question_output = tf.concat([question_fw, question_bw], axis=2)
             tf.summary.histogram('question_output', question_output)
@@ -55,10 +52,7 @@ class Model:
         tf.summary.histogram('xq', xq)
 
         with tf.variable_scope('post_process'):
-            gru_xq_cell = GRUCell(self.dim)
-            gru_xq_cell = DropoutWrapper(gru_xq_cell, input_keep_prob=keep_prob)  # to avoid over-fitting
-
-            outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(gru_xq_cell, gru_xq_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
+            outputs_xq, _ = tf.nn.bidirectional_dynamic_rnn(d_cell, d_cell, inputs=xq, sequence_length=x_len, dtype=tf.float32)
             xq_fw, xq_bw = outputs_xq
             xq_output = tf.concat([xq_fw, xq_bw], axis=2)
             tf.summary.histogram('xq_output', xq_output)
