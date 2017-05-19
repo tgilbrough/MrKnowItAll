@@ -443,14 +443,17 @@ class Data:
             with open('{}/{}.json'.format(ANSWER_DIR, query_id), 'w+') as out:
                 passages = [get_passage(i)
                             for i in range(len(teContext[query_index]))]
-                # passages.sort(key=lambda p: p['relevance'], reverse=True)
+
+                selected_passage = passages[tePassageIndex[query_index]]
+                selected_passage['selected'] = True
+                selected_passage['start_index'] = predictedBegin[query_index].item()
+                selected_passage['end_index'] = predictedEnd[query_index].item()
+
+                passages.sort(key=lambda p: p['relevance'], reverse=True)
 
                 candidate = {
                     'query_id': query_id,
-                    'passages': passages,
-                    'start_index': predictedBegin[query_index].item(),
-                    'end_index': predictedEnd[query_index].item(),
-                    'passage_index': tePassageIndex[query_index]
+                    'passages': passages
                 }
 
                 json.dump(candidate, out, ensure_ascii=False)
