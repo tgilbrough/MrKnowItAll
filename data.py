@@ -453,8 +453,7 @@ class Data:
 
                 candidate = {
                     'query_id': query_id,
-                    'passages': passages,
-                    'answer': predictedAnswer
+                    'passages': passages
                 }
 
                 json.dump(candidate, out, ensure_ascii=False)
