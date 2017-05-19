@@ -57,7 +57,7 @@ class Data:
 
         # Calculating passage relevance weights
         self.vPassWeight = self.passageRevelevance(self.vmContext, self.vQuestion)
-        self.tePassWeight = self.passageRevelevance(self.teContext, self.teQuestion)
+        self.tePassWeight = self.passageRevelevance(self.temContext, self.teQuestion)
 
         # vectorize training and validation datasets
         print('Begin vectorizing process...')
@@ -110,7 +110,7 @@ class Data:
         self.temXLen = np.array(self.temXLen)
         self.teXq = np.array(self.teXq)
         self.teXqLen = np.array(self.teXqLen)
-        self.teContext = np.array(self.teContext, dtype=object)
+        self.temContext = np.array(self.temContext, dtype=object)
         self.teQuestionID = np.array(self.teQuestionID, dtype=object)
         self.tePassWeight = np.array(self.tePassWeight)
         self.teUrl = np.array(self.teUrl, dtype=object)
@@ -149,7 +149,6 @@ class Data:
 
         return {'vX': vX_batch, 'vXLen': vXLen_batch, 'vXq': vXq_batch,
                 'vXqLen':  vXqLen_batch, 'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
-                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch}
 
     def getValBatch(self):
         start = self.valBatchNum * self.batch_size
