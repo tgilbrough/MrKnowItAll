@@ -10,6 +10,7 @@ from sklearn.metrics.pairwise import linear_kernel
 
 class Data:
     def __init__(self, config):
+        self.config = config
         self.batch_size = config.batch_size
         self.keep_prob = config.keep_prob
         self.valBatchNum = 0
@@ -67,14 +68,14 @@ class Data:
         self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion,
                                                      self.tAnswerBegin, self.tAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
-        
+
         self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion,
                                                      self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
         self.vmX, _ = self.vectorizeDataMutli(self.vmContext, self.vQuestion, word_index,
                                                      self.max_context_size, self.max_ques_size)
-        
+
         self.temX, self.teXq = self.vectorizeDataMutli(self.temContext, self.teQuestion, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
@@ -364,7 +365,7 @@ class Data:
             passages = []
             x_len = []
             urls = []
-            
+
 
             for passage in data['passages']:
                 context = passage['passage_text']
@@ -486,7 +487,8 @@ class Data:
         cf.close()
 
     def saveAnswersForEvalTestDemo(self, questionType, candidateName, teContext, teQuestionID, teUrl, predictedBegin, predictedEnd, passageWeights, logitsStart, logitsEnd, tePassageIndex):
-        ANSWER_DIR = '../cse481n-blog/demo/data/answers'
+        ANSWER_DIR = ('../cse481n-blog/demo/data/answers/{}'
+                      .format(self.config.model))
 
         if not os.path.exists(ANSWER_DIR):
             os.makedirs(ANSWER_DIR)
