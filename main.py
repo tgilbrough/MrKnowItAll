@@ -28,6 +28,7 @@ def get_parser():
     parser.add_argument('--tensorboard_name', '-tn', default=None)
     parser.add_argument('--cell', '-c', default='lstm')
     parser.add_argument('--highway_network', '-hwn', type=int, default=1)
+    parser.add_argument('--smart_unk', '-su', type=int, default=1)
 
     return parser
 
@@ -35,7 +36,7 @@ def get_parser():
 def fill_paths(config):
     config.train_path = '{}{}.json'.format('./datasets/msmarco/train/', config.question_type)
     config.val_path = '{}{}.json'.format('./datasets/msmarco/dev/', config.question_type)
-
+    config.test_path = '{}{}.json'.format('./datasets/msmarco/test/', config.question_type)
 
 def main():
     parser = get_parser()
@@ -57,15 +58,14 @@ def main():
     elif config.model == 'coattention':
         model = coattention_model.Model(config, data.max_context_size, data.max_ques_size)
         print("Using coattention model")
-    elif config.model == 'linked_outputs':
-        model = linked_outputs.Model(config, data.max_context_size, data.max_ques_size)
     elif config.model == 'bidaf':
         model = bidaf_model.Model(config, data.max_context_size, data.max_ques_size)
+        print("Using bidaf model")
 
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
     tensorboard_path = './tensorboard_models/' + config.tensorboard_name
-    save_model_path = './saved_models/' + config.tensorboard_name
+    save_model_path = './saved_models/' + config.question_type + '_' + config.tensorboard_name + '.json'
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
 
@@ -78,11 +78,20 @@ def main():
     q_len = tf.placeholder(tf.int32, shape=[None], name='q_len')
     keep_prob = tf.placeholder(tf.float32, shape=[], name='keep_prob')
 
+    with tf.variable_scope('embedding_matrix'):
+        padding_vector = tf.get_variable(name='padding_vector', shape=[1, data.embeddings.shape[1]], initializer=tf.constant_initializer(), trainable=False)
+        if config.smart_unk:
+            unknown_vectors = tf.get_variable(name='unknown_vectors', shape=[len(data.unknown_classes), data.embeddings.shape[1]], initializer=tf.random_normal_initializer(), trainable=True)
+        else:
+            unknown_vectors = tf.get_variable(name='unknown_vectors', shape=[len(data.unknown_classes), data.embeddings.shape[1]], initializer=tf.constant_initializer(), trainable=False)
+        word_embeddings = tf.get_variable(name='emb_mat', shape=data.embeddings.shape, initializer=tf.constant_initializer(data.embeddings), trainable=False)
+        emb_mat = tf.concat([word_embeddings, unknown_vectors, padding_vector], axis=0, name='emb_mat')
+
     # Place holder for just index of answer within context
     y_begin = tf.placeholder(tf.int32, [None], name='y_begin')
     y_end = tf.placeholder(tf.int32, [None], name='y_end')
 
-    model.build(x, x_len, q, q_len, y_begin, y_end, data.embeddings, keep_prob)
+    model.build(x, x_len, q, q_len, y_begin, y_end, emb_mat, keep_prob)
 
     # Save these operation so that we can use them for the demo.
     tf.add_to_collection('logits', model.logits1)
@@ -164,22 +173,19 @@ def main():
 
         # Print out answers for one of the batches
         vContext = []
+        vPassagePred = []
         vQuestionID = []
         predictedBegin = []
         predictedEnd = []
         trueBegin = []
         trueEnd = []
 
-        begin_corr = 0
-        end_corr = 0
-        total = 0
-
+        print('Getting test data answers')
         for i in range(number_of_val_batches):
             valBatch = data.getValBatch()
 
             prediction_begin = tf.cast(tf.argmax(model.logits1, 1), 'int32')
             prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
-
 
             feed_dict={x: valBatch['vX'],
                             x_len: [len(valBatch['vX'][i]) for i in range(len(valBatch['vX']))],
@@ -193,25 +199,15 @@ def main():
 
             for j in range(len(begin)):
                 vContext.append(valBatch['vContext'][j])
+                vPassagePred.append(valBatch['vContext'][j])
                 vQuestionID.append(valBatch['vQuestionID'][j])
                 predictedBegin.append(begin[j])
                 predictedEnd.append(end[j])
                 trueBegin.append(valBatch['vYBegin'][j])
                 trueEnd.append(valBatch['vYEnd'][j])
 
-                begin_corr += int(begin[j] == valBatch['vYBegin'][j])
-                end_corr += int(end[j] == valBatch['vYEnd'][j])
-                total += 1
 
-                #print(batch['vQuestion'][j])
-                #print(batch['vContext'][j][begin[j] : end[j] + 1])
-                #print()
-
-        print('Validation Data:')
-        print('begin accuracy: {}'.format(float(begin_corr) / total))
-        print('end accuracy: {}'.format(float(end_corr) / total))
-
-        data.saveAnswersForEval(config.question_type, config.tensorboard_name, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
-
+        # data.saveAnswersForEval(config.question_type, config.tensorboard_name, vContext, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
+        data.saveAnswersForEvalVal(config.question_type, config.tensorboard_name, vContext, vPassagePred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd)
 if __name__ == "__main__":
     main()

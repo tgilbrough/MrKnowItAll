@@ -15,7 +15,7 @@ class Model:
         self.highway_network_use = config.highway_network
         self.batch_size = config.batch_size
 
-    def build(self, x, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
+    def build(self, x, x_len, q, q_len, y_begin, y_end, emb_mat, keep_prob):
         """
         d: dim
         N: batch_size
@@ -23,10 +23,6 @@ class Model:
         MQ: max_q
         V: vocab_size
         """
-        with tf.variable_scope('embedding_matrix'):
-            # [V, d]
-            emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
-        
         with tf.variable_scope('embedding_context'):
             # [N, MX, d]
             context = tf.nn.embedding_lookup(emb_mat, x, name='context')

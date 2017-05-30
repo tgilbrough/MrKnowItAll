@@ -2,11 +2,12 @@ import json, math
 import numpy as np
 import os
 import nltk
-nltk.download('punkt')
+from tqdm import tqdm
+import re
+import string
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
-
 
 class Data:
     def __init__(self, config):
@@ -15,6 +16,14 @@ class Data:
         self.keep_prob = config.keep_prob
         self.valBatchNum = 0
         self.testBatchNum = 0
+
+        if config.smart_unk:
+            self.unknown_classes = [re.compile('\d+'), # contains a number
+                                    re.compile('^[\s{}]+$'.format(re.escape(string.punctuation))), # punctuation
+                                    re.compile('^[a-z]+$'), # misspelled word
+                                    re.compile('.*')] # catch all
+        else:
+            self.unknown_classes = [re.compile('.*')]
 
         print('Preparing embedding matrix.')
 
@@ -46,17 +55,19 @@ class Data:
 
         self.vocab = vocab
 
-        # Reserve 0 for masking via pad_sequences
-        self.vocab_size = len(vocab) + 1
-        word_index = dict((c, i + 1) for i, c in enumerate(vocab))
+        self.vocab_size = len(vocab)
+        word_index = dict((c, i) for i, c in enumerate(vocab))
         self.max_context_size = max([self.maxLenTContext, self.maxLenVmContext, self.maxLenTeContext])
         self.max_ques_size = max([self.maxLenTQuestion, self.maxLenVQuestion, self.maxLenTeQuestion])
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
-        self.embeddings = self.createEmbeddingMatrix(embeddings_index, word_index)
+        # Cutting down word_index to only include words represented by GloVe embeddings, and updating vocab to only
+        # GloVe words
+        self.embeddings, word_index = self.createEmbeddingMatrix(embeddings_index, word_index)
 
         # Calculating passage relevance weights
+        print('Calculating passage relevance weights...')
         self.vmPassWeight = self.passageRevelevance(self.vmContext, self.vQuestion)
         self.temPassWeight = self.passageRevelevance(self.temContext, self.teQuestion)
 
@@ -82,9 +93,6 @@ class Data:
         print('Vectorizing process completed.')
 
         self.convertToNumpy()
-
-    def getAllData(self):
-        return self.all_data
 
     def convertToNumpy(self):
         self.tX = np.array(self.tX)
@@ -132,11 +140,12 @@ class Data:
         tX_batch = self.tX[points]
         tXLen_batch = self.tXLen[points]
         tXq_batch = self.tXq[points]
+        tXqLen_batch = self.tXqLen[points]
         tYBegin_batch = self.tYBegin[points]
         tYEnd_batch = self.tYEnd[points]
 
         return {'tX': tX_batch, 'tXLen': tXLen_batch, 'tXq': tXq_batch,
-                'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
+                'tXqLen': tXqLen_batch, 'tYBegin': tYBegin_batch, 'tYEnd': tYEnd_batch}
 
     def getRandomValBatch(self):
         points = np.random.choice(len(self.vX), self.batch_size)
@@ -216,20 +225,37 @@ class Data:
 
     def createEmbeddingMatrix(self, embeddings_index, word_index):
         dim_size = len(embeddings_index['a'])
-        # +1 is for <PAD>
-        embedding_matrix = np.zeros((len(word_index) + 1, dim_size))
+
+        embedding_matrix = []
+        new_word_index = {}
+        unknown = set()
+        self.vocab = []
         for word, i in word_index.items():
             embedding_vector = embeddings_index.get(word)
             if embedding_vector is not None:
                 # words not found in embedding index will be all-zeros.
-                embedding_matrix[i] = embedding_vector
-        return embedding_matrix
+                embedding_matrix.append(embedding_vector)
+                new_word_index[word] = len(embedding_matrix) - 1
+                self.vocab.append(word)
+            else:
+                unknown.add(word)
+
+        self.vocab_size = len(self.vocab)
+        embedding_matrix = np.asarray(embedding_matrix)
+
+        print(unknown)
+        print('Number of Unknown Words:', len(unknown))
+        return embedding_matrix, new_word_index
 
     def tokenize(self, sent):
         '''Return the tokens of a context including punctuation. Wrapper around nltk.word_tokenize to
            fix weird quotation marks.
         '''
-        return [token.replace("``", '"').replace("''", '"') for token in nltk.word_tokenize(sent)]
+        tokens = []
+        for token in nltk.word_tokenize(sent):
+            token = token.replace("``", '"').replace("''", '"').replace('’', "'").replace('‘', "'").replace('”', '"').replace('“', '"')
+            tokens.append(token)
+        return tokens
 
     def join(self, sent):
         def join_punctuation(seq, characters='.,;?!'):
@@ -414,8 +440,24 @@ class Data:
         YBegin = []
         YEnd = []
         for i in range(len(xContext)):
-            x = [word_index[w] for w in xContext[i]]
-            xq = [word_index[w] for w in xQuestion[i]]
+            x = []
+            for w in xContext[i]:
+                if w in word_index:
+                    x.append(word_index[w])
+                else:
+                    for j in range(len(self.unknown_classes)):
+                        if re.match(self.unknown_classes[j], w):
+                            x.append(len(word_index) + j)
+                            break
+            xq = []
+            for w in xQuestion[i]:
+                if w in word_index:
+                    xq.append(word_index[w])
+                else:
+                    for j in range(len(self.unknown_classes)):
+                        if re.match(self.unknown_classes[j], w):
+                            x.append(len(word_index) + j)
+                            break
             # map the first and last words of answer span to one-hot representations
             y_Begin =  xAnswerBegin[i]
             y_End = xAnswerEnd[i] - 1
@@ -431,39 +473,68 @@ class Data:
         '''
         X = []
         Xq = []
+
+        smart_unk_counts = [0 for _ in range(len(self.unknown_classes))]
         for i in range(len(xContext)):
-            xs = [[word_index[w] for w in p] for p in xContext[i]]
-            xq = [word_index[w] for w in xQuestion[i]]
-            # map the first and last words of answer span to one-hot representations
+            xs = []
+            for p in xContext[i]:
+                x = []
+                for w in p:
+                    if w in word_index:
+                        x.append(word_index[w])
+                    else:
+                        for j in range(len(self.unknown_classes)):
+                            if re.match(self.unknown_classes[j], w):
+                                x.append(len(word_index) + j)
+                                smart_unk_counts[j] += 1
+                                break
+                xs.append(x)
+            xq = []
+            for w in xQuestion[i]:
+                if w in word_index:
+                    xq.append(word_index[w])
+                else:
+                    for j in range(len(self.unknown_classes)):
+                        if re.match(self.unknown_classes[j], w):
+                            x.append(len(word_index) + j)
+                            smart_unk_counts[j] += 1
+                            break
+
             X.append(self.pad_sequences(xs, context_maxlen))
             Xq.append(xq)
+        
+        print('Smart Unk Counts:', smart_unk_counts)
         return X, self.pad_sequences(Xq, question_maxlen)
 
     def pad_sequences(self, X, maxlen):
+        '''Pad with self.vocab_size + len(self.unknown_classes) which is reserved for the padding vector'''
         for context in X:
             for i in range(maxlen - len(context)):
-                context.append(0)
+                context.append(self.vocab_size + len(self.unknown_classes))
         return X
 
     def passageRevelevance(self, xContext, xQuestion):
         cs = []
-        for i in range(len(xContext)):
+        for i in tqdm(range(len(xContext))):
             passages = [' '.join(p) for p in xContext[i]]
 
-            tfidf = TfidfVectorizer().fit_transform([' '.join(xQuestion[i])] + passages)
+            tfidf = TfidfVectorizer(stop_words='english').fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
 
             # Normalize
             sum_cs = sum(cosine_similarities)
-            cosine_similarities = [x / sum_cs for x in cosine_similarities]
+            if sum_cs > 0:
+                cosine_similarities = [x / sum_cs for x in cosine_similarities]
+            else:
+                cosine_similarities = [1.0 / len(passages) for _ in range(len(passages))]
 
             cs.append(cosine_similarities)
 
         return cs
 
-    def saveAnswersForEvalVal(self, questionType, candidateName, vContext, vContextPred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
+    def saveAnswersForEvalVal(self, questionType, modelName, vContext, vContextPred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
         ref_fn = './references/' + questionType + '.json'
-        can_fn = './candidates/' + candidateName + '.json'
+        can_fn = './candidates/' + questionType + '_' + modelName + '.json'
 
         rf = open(ref_fn, 'w', encoding='utf-8')
         cf = open(can_fn, 'w', encoding='utf-8')

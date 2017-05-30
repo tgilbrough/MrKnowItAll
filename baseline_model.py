@@ -11,12 +11,7 @@ class Model:
         self.max_q = max_q
         self.saver = None
 
-    def build(self, x, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
-        with tf.variable_scope('embedding_matrix'):
-            # embeddings matrix, may be memory ineffecient (Fix)
-            emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
-            tf.summary.histogram('emb_mat', emb_mat)
-
+    def build(self, x, x_len, q, q_len, y_begin, y_end, emb_mat, keep_prob):
         with tf.variable_scope('embedding_context'):
             context = tf.nn.embedding_lookup(emb_mat, x, name='context')
 

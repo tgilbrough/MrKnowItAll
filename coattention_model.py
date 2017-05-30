@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow.contrib.rnn import DropoutWrapper
 from tensorflow.contrib.rnn import GRUCell, LSTMCell
 import numpy as np
-from tf_ops import highway_maxout, batch_linear
 
 # Attempt at recreating: https://arxiv.org/pdf/1611.01604.pdf
 class Model:
@@ -14,12 +13,7 @@ class Model:
         self.max_q = max_q
         self.saver = None
 
-    def build(self, x, x_len, q, q_len, y_begin, y_end, embeddings, keep_prob):
-        with tf.variable_scope('embedding_matrix'):
-            # embeddings matrix, may be memory ineffecient (Fix)
-            emb_mat = tf.get_variable(name='emb_mat', shape=embeddings.shape, initializer=tf.constant_initializer(embeddings), trainable=False)
-            tf.summary.histogram('emb_mat', emb_mat)
-        
+    def build(self, x, x_len, q, q_len, y_begin, y_end, emb_mat, keep_prob):        
         with tf.variable_scope('embedding'):
             context = tf.nn.embedding_lookup(emb_mat, x, name='context') # (batch_size, max_x, emb_size)
             question = tf.nn.embedding_lookup(emb_mat, q, name='question') # (batch_size, max_q, emb_size)
