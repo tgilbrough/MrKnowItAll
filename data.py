@@ -39,8 +39,10 @@ class Data:
         self.vContext, self.vXLen, self.vQuestion, self.vXqLen, self.vQuestionID, self.vAnswerBegin, self.vAnswerEnd, self.vAnswerText, \
             self.maxLenVContext, self.maxLenVQuestion = self.splitMsmarcoDatasets(valData)
 
-        # For the validation data snag the multiple passages
-        self.vmContext, self.vmXLen, self.maxLenVmContext = self.splitMsmarcoDatasetsValMulti(valData)
+        # load validation for eval data, parse, and split
+        valEvalData = self.importMsmarco(config.val_path)
+        self.vmContext, self.vmXLen, self.vmQuestion, self.vmXqLen, self.vmQuestionID, self.vmUrl, \
+            self.maxLenVmContext, self.maxLenVmQuestion = self.splitMsmarcoDatasetsTest(valEvalData)
 
         # load test data, parse, and split
         print('Loading in testing data...')
@@ -50,7 +52,8 @@ class Data:
 
         print('Building vocabulary...')
         # build a vocabulary over all training and validation context paragraphs and question words
-        vocab = self.buildVocab(self.tContext + self.tQuestion + [t for p in self.vmContext for t in p] + self.vQuestion
+        vocab = self.buildVocab(self.tContext + self.tQuestion 
+                                + [t for p in self.vmContext for t in p] + self.vQuestion
                                 + [t for p in self.temContext for t in p] + self.teQuestion)
 
         self.vocab = vocab
@@ -58,7 +61,7 @@ class Data:
         self.vocab_size = len(vocab)
         word_index = dict((c, i) for i, c in enumerate(vocab))
         self.max_context_size = max([self.maxLenTContext, self.maxLenVmContext, self.maxLenTeContext])
-        self.max_ques_size = max([self.maxLenTQuestion, self.maxLenVQuestion, self.maxLenTeQuestion])
+        self.max_ques_size = max([self.maxLenTQuestion, self.maxLenVmQuestion, self.maxLenTeQuestion])
 
         # Note: Need to download and unzip Glove pre-train model files into same file as this script
         embeddings_index = self.loadGloveModel('./datasets/glove/glove.6B.' + str(config.emb_size) + 'd.txt')
@@ -68,7 +71,7 @@ class Data:
 
         # Calculating passage relevance weights
         print('Calculating passage relevance weights...')
-        self.vmPassWeight = self.passageRevelevance(self.vmContext, self.vQuestion)
+        self.vmPassWeight = self.passageRevelevance(self.vmContext, self.vmQuestion)
         self.temPassWeight = self.passageRevelevance(self.temContext, self.teQuestion)
 
         # vectorize training and validation datasets
@@ -84,7 +87,7 @@ class Data:
                                                      self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
-        self.vmX, _ = self.vectorizeDataMutli(self.vmContext, self.vQuestion, word_index,
+        self.vmX, self.vmXq = self.vectorizeDataMutli(self.vmContext, self.vmQuestion, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
         self.temX, self.teXq = self.vectorizeDataMutli(self.temContext, self.teQuestion, word_index,
@@ -107,12 +110,14 @@ class Data:
         self.vmX = np.array(self.vmX)
         self.vmXLen = np.array(self.vmXLen)
         self.vXq = np.array(self.vXq)
+        self.vmXq = np.array(self.vmXq)
         self.vXqLen = np.array(self.vXqLen)
         self.vYBegin = np.array(self.vYBegin)
         self.vYEnd = np.array(self.vYEnd)
         self.vContext = np.array(self.vContext, dtype=object)
         self.vmContext = np.array(self.vmContext, dtype=object)
-        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
+        self.vmQuestionID = np.array(self.vQuestionID, dtype=object)
+        self.vmUrl = np.array(self.vmUrl, dtype=object)
         self.vmPassWeight = np.array(self.vmPassWeight)
 
         self.temX = np.array(self.temX)
@@ -165,16 +170,13 @@ class Data:
         end = min(len(self.vX), (self.valBatchNum + 1) * self.batch_size)
         points = np.arange(start, end)
 
-        vContext_batch = self.vContext[points]
         vmContext_batch = self.vmContext[points]
-        vQuestionID_batch = self.vQuestionID[points]
-        vX_batch = self.vX[points]
+        vmQuestionID_batch = self.vmQuestionID[points]
         vmX_batch = self.vmX[points]
         vmXLen_batch = self.vmXLen[points]
-        vXq_batch = self.vXq[points]
-        vXqLen_batch = self.vXqLen[points]
-        vYBegin_batch = self.vYBegin[points]
-        vYEnd_batch = self.vYEnd[points]
+        vmXq_batch = self.vmXq[points]
+        vmXqLen_batch = self.vXqLen[points]
+        vmUrl_batch = self.vmUrl[points]
         vmXPassWeights_batch = self.vmPassWeight[points]
 
         self.valBatchNum += 1
@@ -182,10 +184,9 @@ class Data:
         if self.valBatchNum >= self.getNumValBatches():
             self.valBatchNum = 0
 
-        return {'vContext': vContext_batch, 'vmContext': vmContext_batch, 'vQuestionID': vQuestionID_batch,
-                'vX': vX_batch, 'vmX': vmX_batch, 'vmXLen': vmXLen_batch, 'vXq': vXq_batch, 'vXqLen': vXqLen_batch,
-                'vYBegin': vYBegin_batch, 'vYEnd': vYEnd_batch,
-                'vmXPassWeight': vmXPassWeights_batch}
+        return {'vmContext': vmContext_batch, 'vmQuestionID': vmQuestionID_batch,
+                'vmX': vmX_batch, 'vmXLen': vmXLen_batch, 'vmXq': vmXq_batch, 'vmXqLen': vmXqLen_batch,
+                'vmUrl': vmUrl_batch, 'vmXPassWeight': vmXPassWeights_batch}
 
     def getTestBatch(self):
         start = self.testBatchNum * self.batch_size
@@ -392,7 +393,6 @@ class Data:
             x_len = []
             urls = []
 
-
             for passage in data['passages']:
                 context = passage['passage_text']
                 contextTokenized = self.tokenize(context.lower())
@@ -532,21 +532,29 @@ class Data:
 
         return cs
 
-    def saveAnswersForEvalVal(self, questionType, modelName, vContext, vContextPred, vQuestionID, predictedBegin, predictedEnd, trueBegin, trueEnd):
+    def saveAnswersForEvalVal(self, questionType, modelName, vContextPred, vQuestionID, predictedBegin, predictedEnd):
         ref_fn = './references/' + questionType + '.json'
         can_fn = './candidates/' + questionType + '_' + modelName + '.json'
 
         rf = open(ref_fn, 'w', encoding='utf-8')
         cf = open(can_fn, 'w', encoding='utf-8')
 
-        for i in range(len(vContext)):
+        answers = {}
+        with open('./datasets/msmarco/dev/' + questionType + '.json', encoding='utf-8') as f:
+            for line in f:
+                sample = json.loads(line)
+                if len(sample['answers']) > 0:
+                    answers[sample['query_id']] = [sample['answers'][0]]
+                else:
+                    answers[sample['query_id']] = ['']
+
+        for i in range(len(vContextPred)):
             predictedAnswer = ' '.join(vContextPred[i][predictedBegin[i] : predictedEnd[i] + 1])
-            trueAnswer = ' '.join(vContext[i][trueBegin[i] : trueEnd[i] + 1])
 
             reference = {}
             candidate = {}
             reference['query_id'] = vQuestionID[i]
-            reference['answers'] = [trueAnswer]
+            reference['answers'] = [answers[vQuestionID[i]]]
 
             candidate['query_id'] = vQuestionID[i]
             candidate['answers'] = [predictedAnswer]
@@ -582,8 +590,8 @@ class Data:
 
                 selected_passage = passages[tePassageIndex[query_index]]
                 selected_passage['selected'] = True
-                selected_passage['start_index'] = predictedBegin[query_index].item()
-                selected_passage['end_index'] = predictedEnd[query_index].item()
+                selected_passage['start_index'] = predictedBegin[query_index]
+                selected_passage['end_index'] = predictedEnd[query_index]
 
                 passages.sort(key=lambda p: p['relevance'], reverse=True)
 
