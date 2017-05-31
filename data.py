@@ -116,7 +116,8 @@ class Data:
         self.vYEnd = np.array(self.vYEnd)
         self.vContext = np.array(self.vContext, dtype=object)
         self.vmContext = np.array(self.vmContext, dtype=object)
-        self.vmQuestionID = np.array(self.vQuestionID, dtype=object)
+        self.vQuestionID = np.array(self.vQuestionID, dtype=object)
+        self.vmQuestionID = np.array(self.vmQuestionID, dtype=object)
         self.vmUrl = np.array(self.vmUrl, dtype=object)
         self.vmPassWeight = np.array(self.vmPassWeight)
 
@@ -244,7 +245,7 @@ class Data:
         self.vocab_size = len(self.vocab)
         embedding_matrix = np.asarray(embedding_matrix)
 
-        print(unknown)
+        # print(unknown)
         print('Number of Unknown Words:', len(unknown))
         return embedding_matrix, new_word_index
 
@@ -544,9 +545,9 @@ class Data:
             for line in f:
                 sample = json.loads(line)
                 if len(sample['answers']) > 0:
-                    answers[sample['query_id']] = [sample['answers'][0]]
+                    answers[sample['query_id']] = sample['answers'][0].lower()
                 else:
-                    answers[sample['query_id']] = ['']
+                    answers[sample['query_id']] = ''
 
         for i in range(len(vContextPred)):
             predictedAnswer = ' '.join(vContextPred[i][predictedBegin[i] : predictedEnd[i] + 1])

@@ -174,9 +174,6 @@ def main():
             prediction_end = tf.cast(tf.argmax(model.logits2, 1), 'int32')
             prediction_begin_prob = tf.reduce_max(tf.nn.softmax(model.logits1), 1)
             prediction_end_prob = tf.reduce_max(tf.nn.softmax(model.logits2), 1)
-            softmax_begin = tf.nn.softmax(model.logits1)
-            softmax_end = tf.nn.softmax(model.logits2)
-
             for i in range(len(valBatch['vmXq'])):
                 max_passage_score = 0.0
                 passage_idx = 0
@@ -191,26 +188,15 @@ def main():
                                     y_begin: [0],
                                     y_end: [0],
                                     keep_prob: 1.0}
-                    begin, end, begin_prob, end_prob, ls, lb = sess.run([prediction_begin, prediction_end,
-                                                                prediction_begin_prob, prediction_end_prob,
-                                                                softmax_begin, softmax_end], feed_dict=feed_dict)
+                    begin, end, begin_prob, end_prob= sess.run([prediction_begin, prediction_end,
+                                                                prediction_begin_prob, prediction_end_prob], feed_dict=feed_dict)
                     
-                    max_score = 0.0
-                    si = 0
-                    en = 0
-                    for j in range(len(ls[0])):
-                        for k in range(j, len(lb[0])):
-                            score = ls[0][j] * lb[0][k]
-                            if score > max_score:
-                                max_score = score
-                                si = j
-                                ei = k
+                    passage_score = valBatch['vmXPassWeight'][i][p] * begin_prob[0] * end_prob[0]
 
-                    passage_score = valBatch['vmXPassWeight'][i][p] * max_score
                     if passage_score > max_passage_score:
                         max_passage_score = passage_score
-                        start_idx = si
-                        end_idx = ei
+                        start_idx = begin[0].item()
+                        end_idx = end[0].item()
                         passage_idx = p
 
                 vPassagePred.append(valBatch['vmContext'][i][passage_idx])
@@ -250,7 +236,7 @@ def main():
             softmax_end = tf.nn.softmax(model.logits2)
 
             for i in range(len(testBatch['teXq'])):
-                max_start_score = 0.0
+                max_passage_score = 0.0
                 passage_idx = 0
                 start_idx = 0
                 end_idx = 0
@@ -267,22 +253,12 @@ def main():
                     begin, end, begin_prob, end_prob, lb, le = sess.run([prediction_begin, prediction_end,
                                                                 prediction_begin_prob, prediction_end_prob,
                                                                 softmax_begin, softmax_end], feed_dict=feed_dict)
-                    max_score = 0.0
-                    si = 0
-                    en = 0
-                    for j in range(len(lb[0])):
-                        for k in range(j, len(le[0])):
-                            score = lb[0][j] * le[0][k]
-                            if score > max_score:
-                                max_score = score
-                                si = j
-                                ei = k
 
-                    passage_score = testBatch['temXPassWeight'][i][p] * max_score
+                    passage_score = testBatch['temXPassWeight'][i][p] * begin_prob[0] * end_prob[0]
                     if passage_score > max_passage_score:
                         max_passage_score = passage_score
-                        start_idx = si
-                        end_idx = ei
+                        start_idx = begin[0].item()
+                        end_idx = end[0].item()
                         passage_idx = p
 
                     logits_start.append(lb[0].tolist())
