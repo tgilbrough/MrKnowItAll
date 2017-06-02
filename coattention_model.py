@@ -73,6 +73,7 @@ class Model:
 
         alpha = tf.layers.dense(U, 1, name='alpha')
         alpha = tf.reshape(alpha, [-1, self.max_x + 1])
+
         beta = tf.layers.dense(U, 1, name='beta')
         beta = tf.reshape(beta, [-1, self.max_x + 1])
 
@@ -85,7 +86,6 @@ class Model:
             acc2 = tf.reduce_mean(tf.cast(tf.equal(y_end, tf.cast(tf.argmax(beta, 1), 'int32')), 'float'), name='ending_accuracy')
 
         self.loss = loss
-        # self.loss = self._loss_multitask(self._alpha, y_begin, self._beta, y_end)
 
         tf.summary.scalar('loss', loss)
         tf.summary.scalar('loss1', loss1)
@@ -98,17 +98,3 @@ class Model:
         
         self.merged_summary = tf.summary.merge_all()
     
-
-    def _loss_multitask(self, logits_alpha, labels_alpha, logits_beta, labels_beta):
-        '''Cumulative loss for start and end positions.'''
-        fn = lambda logit, label: self._loss_shared(logit, label)
-        loss_alpha = [fn(alpha, labels_alpha) for alpha in logits_alpha]
-        loss_beta = [fn(beta, labels_beta) for beta in logits_beta]
-        return tf.reduce_sum([loss_alpha, loss_beta], name='loss')
-
-    def _loss_shared(self, logits, labels):
-        labels = tf.reshape(labels, [-1])
-        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=labels, name='per_step_cross_entropy')
-        cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-        tf.add_to_collection('per_step_losses', cross_entropy_mean)
-        return tf.add_n(tf.get_collection('per_step_losses'), name='per_step_loss')
