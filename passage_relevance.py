@@ -1,4 +1,6 @@
 import json
+import collections 
+import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
@@ -34,7 +36,7 @@ def load_passages(path):
     return samples
 
 def get_rank(t):
-    tfidf = TfidfVectorizer().fit_transform([t['query']] + t['passages'])
+    tfidf = TfidfVectorizer(binary=True).fit_transform([t['query']] + t['passages'])
     cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
     related_docs_indices = cosine_similarities.argsort()[::-1]
     try:
@@ -54,15 +56,15 @@ def get_accuracy(passages):
 
 
 def main():
-    for question_type in ['entity', 'location', 'description', 'numeric', 'person']:
+    for question_type in ['description', 'numeric', 'entity', 'location', 'person']:
         path = 'datasets/msmarco/train/{}.json'.format(question_type)
         passages = load_passages(path)
         accuracy = get_accuracy(passages)
-        plt.plot(accuracy, label=question_type)
+        plt.plot(range(1, len(accuracy) + 1), accuracy, label=question_type)
 
     plt.ylabel('Percent of Questions where Selected Passage is Included')
     plt.xlabel('Number of Passages')
-    plt.legend()
+    plt.legend(loc='lower right')
     plt.show()
 
 main()
