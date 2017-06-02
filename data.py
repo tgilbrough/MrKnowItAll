@@ -79,17 +79,21 @@ class Data:
 
         # tX: training Context, tXq: training Question, tYBegin: training Answer Begin ptr,
         # tYEnd: training Answer End ptr
+        print('Vectorizing train data...')
         self.tX, self.tXq, self.tYBegin, self.tYEnd = self.vectorizeData(self.tContext, self.tQuestion,
                                                      self.tAnswerBegin, self.tAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
+        print('Vectorizing validation data...')
         self.vX, self.vXq, self.vYBegin, self.vYEnd = self.vectorizeData(self.vContext, self.vQuestion,
                                                      self.vAnswerBegin, self.vAnswerEnd, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
+        
         self.vmX, self.vmXq = self.vectorizeDataMutli(self.vmContext, self.vmQuestion, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
+        print('Vectorizing test data...')
         self.temX, self.teXq = self.vectorizeDataMutli(self.temContext, self.teQuestion, word_index,
                                                      self.max_context_size, self.max_ques_size)
 
@@ -316,6 +320,8 @@ class Data:
 
                 for answer in data['answers']:
                     answerTokenized = self.tokenize(answer.lower())
+                    if len(answerTokenized) == 0:
+                        continue
                     answerBeginIndex, answerEndIndex = self.findAnswer(contextTokenized, answerTokenized)
                     if answerBeginIndex != None:
                         xContext.append(contextTokenized)
@@ -429,7 +435,7 @@ class Data:
         for i in range(contextLen - answerLen + 1):
             match = sum([1 for j, m in zip(contextTokenized[i:i + answerLen], answerTokenized) if j == m])
             if match == answerLen:
-                return (i, i + answerLen)
+                return (i, i + answerLen - 1)
         return (None, None)
 
     def vectorizeData(self, xContext, xQuestion, xAnswerBegin, xAnswerEnd, word_index, context_maxlen, question_maxlen):
@@ -440,6 +446,7 @@ class Data:
         Xq = []
         YBegin = []
         YEnd = []
+        smart_unk_counts = [0 for _ in range(len(self.unknown_classes))]
         for i in range(len(xContext)):
             x = []
             for w in xContext[i]:
@@ -449,6 +456,7 @@ class Data:
                     for j in range(len(self.unknown_classes)):
                         if re.match(self.unknown_classes[j], w):
                             x.append(len(word_index) + j)
+                            smart_unk_counts[j] += 1
                             break
             xq = []
             for w in xQuestion[i]:
@@ -461,11 +469,14 @@ class Data:
                             break
             # map the first and last words of answer span to one-hot representations
             y_Begin =  xAnswerBegin[i]
-            y_End = xAnswerEnd[i] - 1
+            y_End = xAnswerEnd[i]
             X.append(x)
             Xq.append(xq)
             YBegin.append(y_Begin)
             YEnd.append(y_End)
+
+        print('Smart Unk Counts:', smart_unk_counts)
+        print('Percentage Unknown:', sum(smart_unk_counts) / sum(len(p) for p in xContext))
         return self.pad_sequences(X, context_maxlen), self.pad_sequences(Xq, question_maxlen), YBegin, YEnd
 
     def vectorizeDataMutli(self, xContext, xQuestion, word_index, context_maxlen, question_maxlen):
@@ -498,13 +509,13 @@ class Data:
                     for j in range(len(self.unknown_classes)):
                         if re.match(self.unknown_classes[j], w):
                             x.append(len(word_index) + j)
-                            smart_unk_counts[j] += 1
                             break
 
             X.append(self.pad_sequences(xs, context_maxlen))
             Xq.append(xq)
         
         print('Smart Unk Counts:', smart_unk_counts)
+        print('Percentage Unknown:', sum(smart_unk_counts) / sum(len(p) for s in xContext for p in s))
         return X, self.pad_sequences(Xq, question_maxlen)
 
     def pad_sequences(self, X, maxlen):
@@ -519,7 +530,7 @@ class Data:
         for i in tqdm(range(len(xContext))):
             passages = [' '.join(p) for p in xContext[i]]
 
-            tfidf = TfidfVectorizer(stop_words='english').fit_transform([' '.join(xQuestion[i])] + passages)
+            tfidf = TfidfVectorizer(stop_words='english', binary=True).fit_transform([' '.join(xQuestion[i])] + passages)
             cosine_similarities = linear_kernel(tfidf[0:1], tfidf).flatten()[1:]
 
             # Normalize
