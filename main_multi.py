@@ -61,7 +61,7 @@ def main():
     if config.tensorboard_name is None:
         config.tensorboard_name = model.model_name
     tensorboard_path = './tensorboard_models/' + config.tensorboard_name
-    save_model_path = './saved_models/' + config.question_type + '_' + config.tensorboard_name + '.json'
+    save_model_path = './saved_models/' + config.question_type + '_' + config.tensorboard_name
     if not os.path.exists(save_model_path):
         os.makedirs(save_model_path)
 
