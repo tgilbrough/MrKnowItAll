@@ -64,7 +64,7 @@ def main():
 
     plt.ylabel('Percent of Questions where Selected Passage is Included')
     plt.xlabel('Number of Passages')
-    plt.legend(loc='lower right')
+    plt.legend(loc='upper left')
     plt.show()
 
 main()
